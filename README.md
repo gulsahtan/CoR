@@ -171,18 +171,22 @@ The application does not run the project's tests during repair generation. Valid
 
 ## Computing Infrastructure
 
-The application was developed for:
+The application was developed and evaluated using the following computing environment:
 
-- operating system: Windows 10/11 or Linux/macOS with .NET support,
-- runtime: .NET 9 SDK,
-- web framework: ASP.NET Core Razor Pages,
-- language: C#,
-- CPU: standard x86-64 workstation or server CPU,
-- memory: at least 4 GB RAM recommended,
-- network: required only for live OpenAI API calls,
-- optional external compilers: `javac`, `python`/`python3`, `gcc` or `clang`.
+- Operating System: Microsoft Windows 10 (64-bit)
+- CPU: Intel Core i7-11700F (8 cores, 16 threads)
+- GPU: NVIDIA GeForce RTX 3070 (8 GB GDDR6)
+- Memory: 32 GB RAM
+- Runtime: .NET 9 SDK
+- Programming Language: C# 13
+- Web Framework: ASP.NET Core Razor Pages
+- AI Integration: Official OpenAI .NET SDK
+- Optional External Compilers:
+  - Java: `javac`
+  - Python: `python` / `python3`
+  - C: `gcc` or `clang`
 
-Exact runtime diagnostics are available in the web app's Diagnostics page, including operating system, CPU architecture, .NET version, compiler configuration, model settings, and recent experiment logs.
+Internet connectivity is required only for live OpenAI API calls. Runtime diagnostics, including operating system, CPU architecture, .NET version, compiler configuration, model settings, and execution logs, are available through the Diagnostics page of the application.
 
 ## Requirements
 
