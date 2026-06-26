@@ -1,0 +1,58 @@
+@page
+@model ChainOfRepair.Web.Pages.DiagnosticsModel
+@{
+    ViewData["Title"] = "Diagnostics";
+}
+
+<section class="cor-band">
+    <h1 class="h3">Reproducibility Dashboard</h1>
+    <div class="row g-3 mt-1">
+        <div class="col-lg-6">
+            <h2 class="h6">Environment</h2>
+            <dl class="row">
+                <dt class="col-sm-4">Operating system</dt><dd class="col-sm-8">@Model.Diagnostics.OperatingSystem</dd>
+                <dt class="col-sm-4">CPU architecture</dt><dd class="col-sm-8">@Model.Diagnostics.CpuArchitecture</dd>
+                <dt class="col-sm-4">.NET version</dt><dd class="col-sm-8">@Model.Diagnostics.DotNetVersion</dd>
+                <dt class="col-sm-4">LLM provider</dt><dd class="col-sm-8">@Model.Diagnostics.LlmProvider</dd>
+                <dt class="col-sm-4">OpenAI model</dt><dd class="col-sm-8">@Model.Diagnostics.OpenAiModelName</dd>
+                <dt class="col-sm-4">Mock client</dt><dd class="col-sm-8">@(Model.Diagnostics.UseMockClient ? "DEMO MODE - NOT VALID FOR REPRODUCIBILITY." : "Disabled")</dd>
+                <dt class="col-sm-4">Temperature</dt><dd class="col-sm-8">@Model.Diagnostics.Temperature</dd>
+                <dt class="col-sm-4">Max tokens</dt><dd class="col-sm-8">@Model.Diagnostics.MaxTokens</dd>
+            </dl>
+        </div>
+        <div class="col-lg-6">
+            <h2 class="h6">Dependency Versions</h2>
+            <ul class="list-group list-group-flush">
+                @foreach (var item in Model.Diagnostics.DependencyVersions)
+                {
+                    <li class="list-group-item d-flex justify-content-between gap-3"><span>@item.Key</span><code>@item.Value</code></li>
+                }
+            </ul>
+            <h2 class="h6 mt-3">Configured Compiler Paths</h2>
+            <ul class="list-group list-group-flush">
+                @foreach (var item in Model.Diagnostics.CompilerPaths)
+                {
+                    <li class="list-group-item d-flex justify-content-between gap-3"><span>@item.Key</span><code>@item.Value</code></li>
+                }
+            </ul>
+        </div>
+        <div class="col-lg-6">
+            <h2 class="h6">Dataset References</h2>
+            <ul>
+                @foreach (var item in Model.Diagnostics.DatasetReferences)
+                {
+                    <li>@item</li>
+                }
+            </ul>
+        </div>
+        <div class="col-lg-6">
+            <h2 class="h6">Timestamped Experiment Logs</h2>
+            <ul class="log-list">
+                @foreach (var item in Model.Diagnostics.TimestampedExperimentLogs)
+                {
+                    <li><code>@item</code></li>
+                }
+            </ul>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+*.log
+logs/*.json
+sample_outputs/*.json
+sample_outputs/*.csv
+TestResults/

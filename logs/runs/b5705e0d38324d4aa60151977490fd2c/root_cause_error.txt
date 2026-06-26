@@ -1,0 +1,1 @@
+OPENAI_API_KEY is not set. Chain-of-Repair requires a real OpenAI API key and will not fall back to canned responses.

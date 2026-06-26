@@ -1,0 +1,2 @@
+java.lang.NullPointerException
+    at Example.divide(Example.java:3)

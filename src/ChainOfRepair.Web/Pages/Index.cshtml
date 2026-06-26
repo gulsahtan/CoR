@@ -1,0 +1,212 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Chain-of-Repair";
+}
+
+<section class="cor-band">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 align-items-lg-end mb-3">
+        <div>
+            <h1 class="h2 mb-1">Chain-of-Repair</h1>
+            <p class="text-muted mb-0">Artifact-aware localization, LLM repair, validation, and reproducibility logging.</p>
+        </div>
+        @if (Model.Result is not null)
+        {
+            <span class="badge text-bg-@(Model.Result.FinalStatus == "repaired" ? "success" : "secondary") fs-6">@Model.Result.FinalStatus</span>
+        }
+    </div>
+    @if (Model.Result?.MockClientUsed == true)
+    {
+        <div class="alert alert-warning">DEMO MODE - NOT VALID FOR REPRODUCIBILITY.</div>
+    }
+
+    <form method="post" class="row g-3">
+        <div class="col-lg-8">
+            <label asp-for="Input.SourceCode" class="form-label">Source Code</label>
+            <textarea asp-for="Input.SourceCode" class="form-control code-input" spellcheck="false"></textarea>
+        </div>
+        <div class="col-lg-4">
+            <label asp-for="Input.FailingOutput" class="form-label">Failing Test / Compile Output</label>
+            <textarea asp-for="Input.FailingOutput" class="form-control code-input" spellcheck="false"></textarea>
+        </div>
+        <div class="col-lg-8">
+            <label asp-for="Input.BugDescription" class="form-label">Bug Description</label>
+            <textarea asp-for="Input.BugDescription" class="form-control small-input"></textarea>
+        </div>
+        <div class="col-sm-6 col-lg-2">
+            <label asp-for="Input.Language" class="form-label">Language</label>
+            <select asp-for="Input.Language" class="form-select" asp-items="Html.GetEnumSelectList<ChainOfRepair.Core.Models.SupportedLanguage>()"></select>
+        </div>
+        <div class="col-sm-3 col-lg-1">
+            <label asp-for="Input.TopK" class="form-label">Top-K</label>
+            <select asp-for="Input.TopK" class="form-select">
+                <option value="3">3</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+            </select>
+        </div>
+        <div class="col-sm-3 col-lg-1">
+            <label asp-for="Input.FileName" class="form-label">File</label>
+            <input asp-for="Input.FileName" class="form-control" />
+        </div>
+        <div class="col-12">
+            <button class="btn btn-primary" type="submit">Run Analysis</button>
+        </div>
+    </form>
+</section>
+
+@if (Model.Result is not null)
+{
+    <section class="cor-band mt-4">
+        <h2 class="h4">LLM Runtime</h2>
+        @if (!string.IsNullOrWhiteSpace(Model.Result.ErrorMessage))
+        {
+            <div class="alert alert-danger">@Model.Result.ErrorMessage</div>
+        }
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Real LLM client</dt><dd class="col-sm-9">@(Model.Result.UsedRealLlmClient ? "Yes" : "No")</dd>
+            <dt class="col-sm-3">Client</dt><dd class="col-sm-9">@Model.Result.LlmClientName</dd>
+            <dt class="col-sm-3">Model</dt><dd class="col-sm-9">@Model.Result.ModelName</dd>
+            <dt class="col-sm-3">Prompt templates</dt><dd class="col-sm-9">@string.Join(", ", Model.Result.PromptTemplatesUsed)</dd>
+            <dt class="col-sm-3">Run log</dt><dd class="col-sm-9"><code>@Model.Result.LogDirectory</code></dd>
+        </dl>
+    </section>
+
+    <section class="cor-band mt-4">
+        <h2 class="h4">Pipeline Execution Trace</h2>
+        <ol class="trace-list">
+            @foreach (var item in Model.Result.Trace)
+            {
+                <li><strong>@item.Stage</strong> <span>@item.Timestamp.ToLocalTime().ToString("u")</span><p>@item.Message</p></li>
+            }
+        </ol>
+    </section>
+
+    <section class="cor-band mt-4">
+        <h2 class="h4">Extracted Artifacts</h2>
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <h3 class="h6">Candidate Methods</h3>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead><tr><th>Name</th><th>Context</th><th>Lines</th><th>Constructs</th></tr></thead>
+                        <tbody>
+                        @foreach (var method in Model.Result.Preprocessing.CandidateMethods)
+                        {
+                            <tr>
+                                <td>@method.Name</td>
+                                <td>@method.Context</td>
+                                <td>@method.StartLine-@method.EndLine</td>
+                                <td>@string.Join(", ", method.SuspiciousConstructs)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <h3 class="h6">Failing Output Signals</h3>
+                <pre class="code-panel">@System.Text.Json.JsonSerializer.Serialize(Model.Result.Preprocessing.FailingOutput, ChainOfRepair.Core.Models.JsonLog.Options)</pre>
+            </div>
+        </div>
+    </section>
+
+    <section class="cor-band mt-4">
+        <h2 class="h4">Ranked Candidate Methods</h2>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead><tr><th>Method</th><th>Lines</th><th>Source</th><th>Stack</th><th>Bug</th><th>Revision</th><th>Final</th><th>Explanation</th></tr></thead>
+                <tbody>
+                @foreach (var ranked in Model.Result.Ranking.RankedMethods)
+                {
+                    <tr class="@(ranked == Model.Result.SelectedMethod ? "table-primary" : "")">
+                        <td>@ranked.Method.Context.@ranked.Method.Name</td>
+                        <td>@ranked.Method.StartLine-@ranked.Method.EndLine</td>
+                        <td>@ranked.SourceCodeScore</td>
+                        <td>@ranked.StackTraceScore</td>
+                        <td>@ranked.BugReportScore</td>
+                        <td>@ranked.RevisionHistoryScore</td>
+                        <td><strong>@ranked.FinalSuspiciousnessScore</strong></td>
+                        <td>@ranked.Explanation</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="cor-band mt-4">
+        <h2 class="h4">Repair Reasoning</h2>
+        <div class="row g-3">
+            <div class="col-lg-6"><h3 class="h6">Selected Method</h3><pre class="code-panel">@Model.Result.SelectedMethod?.Method.Source</pre></div>
+            <div class="col-lg-6"><h3 class="h6">Root-Cause JSON</h3><pre class="code-panel">@Model.Result.Reasoning.RootCause</pre></div>
+            <div class="col-lg-6"><h3 class="h6">Patch JSON</h3><pre class="code-panel diff">@Model.Result.Reasoning.PatchJson</pre></div>
+            <div class="col-lg-6"><h3 class="h6">Self-Consistency Result</h3><pre class="code-panel">@Model.Result.Reasoning.SelfConsistency</pre></div>
+            <div class="col-lg-6"><h3 class="h6">Final Developer Explanation</h3><pre class="code-panel">@Model.Result.Reasoning.Explanation</pre></div>
+        </div>
+    </section>
+
+    <section class="cor-band mt-4">
+        <h2 class="h4">Patched Source and Diff</h2>
+        <div class="row g-3">
+            <div class="col-lg-6"><h3 class="h6">Original Source</h3><pre class="code-panel">@Model.Result.FinalValidation.PatchApplication.OriginalCode</pre></div>
+            <div class="col-lg-6"><h3 class="h6">Final Patched Source</h3><pre class="code-panel">@Model.Result.FinalValidation.PatchApplication.PatchedCode</pre></div>
+            <div class="col-12"><h3 class="h6">Final Unified Diff</h3><pre class="code-panel diff">@Model.Result.FinalValidation.PatchApplication.UnifiedDiff</pre></div>
+        </div>
+    </section>
+
+    <section class="cor-band mt-4">
+        <h2 class="h4">Validation and Refinement</h2>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>Rule</th><th>Status</th><th>Message</th></tr></thead>
+                <tbody>
+                @foreach (var check in Model.Result.FinalValidation.Checks)
+                {
+                    <tr>
+                        <td>@check.Rule</td>
+                        <td><span class="badge text-bg-@(check.Passed ? "success" : "danger")">@(check.Passed ? "passed" : "failed")</span></td>
+                        <td>@check.Message</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <h3 class="h6">Refinement Iteration History</h3>
+        @if (Model.Result.RefinementIterations.Count == 0)
+        {
+            <p class="text-muted">No refinement iterations were required.</p>
+        }
+        else
+        {
+            @foreach (var iteration in Model.Result.RefinementIterations)
+            {
+                <details class="mb-2">
+                    <summary>Iteration @iteration.Iteration: @(iteration.Validation.Passed ? "passed" : "failed")</summary>
+                    <h4 class="h6 mt-2">Patch JSON</h4>
+                    <pre class="code-panel diff">@iteration.PatchJson</pre>
+                    <h4 class="h6">Self-Consistency</h4>
+                    <pre class="code-panel">@iteration.SelfConsistency</pre>
+                    <h4 class="h6">Validation Failures</h4>
+                    <pre class="code-panel">@System.Text.Json.JsonSerializer.Serialize(iteration.Validation.Checks.Where(c => !c.Passed), ChainOfRepair.Core.Models.JsonLog.Options)</pre>
+                </details>
+            }
+        }
+        <p class="text-muted mb-0">JSON experiment log: @Model.Result.LogPath</p>
+    </section>
+
+    <section class="cor-band mt-4">
+        <h2 class="h4">LLM Exchanges</h2>
+        @foreach (var exchange in Model.Result.Reasoning.Exchanges)
+        {
+            <details class="mb-2">
+                <summary>@exchange.Stage via @exchange.Client (@exchange.Model)</summary>
+                <p class="text-muted mb-1">Template: <code>@exchange.TemplatePath</code></p>
+                <h3 class="h6">Prompt</h3>
+                <pre class="code-panel">@exchange.UserPrompt</pre>
+                <h3 class="h6">Response</h3>
+                <pre class="code-panel">@exchange.Response</pre>
+            </details>
+        }
+    </section>
+}

@@ -1,0 +1,8 @@
+{
+  "sourceCode": "public class Example {\r\n    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }\r\n}",
+  "failingOutput": "java.lang.NullPointerException\r\n\tat Example.divide(Example.java:3)",
+  "bugDescription": "Division fails when input is null or zero.",
+  "language": "C",
+  "topK": 5,
+  "fileName": "Example.java"
+}

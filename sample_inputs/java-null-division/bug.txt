@@ -1,0 +1,1 @@
+Division fails when the input value is null. The method should handle invalid input before arithmetic.

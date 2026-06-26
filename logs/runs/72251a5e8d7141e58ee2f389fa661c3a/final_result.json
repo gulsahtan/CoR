@@ -1,0 +1,234 @@
+{
+  "runId": "72251a5e8d7141e58ee2f389fa661c3a",
+  "request": {
+    "sourceCode": "public class Example {\r\n    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }\r\n}",
+    "failingOutput": "java.lang.NullPointerException\r\n\tat Example.divide(Example.java:3)",
+    "bugDescription": "Division fails when input is null or zero.",
+    "language": "Java",
+    "topK": 5,
+    "fileName": "Example.java"
+  },
+  "preprocessing": {
+    "candidateMethods": [
+      {
+        "name": "divide",
+        "context": "Example",
+        "startLine": 1,
+        "endLine": 5,
+        "source": "public class Example {\r\n    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }\r\n}",
+        "localContext": "public class Example {\r\n    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }\r\n}",
+        "controlFlowIndicators": [
+          "return"
+        ],
+        "suspiciousConstructs": [
+          "API call"
+        ]
+      }
+    ],
+    "failingOutput": {
+      "stackTraceFrames": [
+        {
+          "fileName": "Example.java",
+          "methodName": "Example.divide",
+          "lineNumber": 3,
+          "raw": "at Example.divide(Example.java:3)"
+        }
+      ],
+      "compilerErrors": [],
+      "warnings": [],
+      "fileNames": [
+        "Example.java"
+      ],
+      "methodNames": [
+        "divide"
+      ],
+      "lineNumbers": [
+        3
+      ],
+      "errorTypes": [
+        "java.lang.NullPointerException"
+      ]
+    },
+    "logs": [
+      {
+        "timestamp": "2026-06-26T12:51:37.5124805+00:00",
+        "step": "input.accepted",
+        "message": "Accepted Java source text.",
+        "data": {
+          "topK": 5,
+          "fileName": "Example.java"
+        }
+      },
+      {
+        "timestamp": "2026-06-26T12:51:37.512613+00:00",
+        "step": "source.normalized",
+        "message": "Normalized source into line-indexed representation.",
+        "data": {
+          "lineCount": 5
+        }
+      },
+      {
+        "timestamp": "2026-06-26T12:51:37.5324217+00:00",
+        "step": "source.method.recorded",
+        "message": "Recorded candidate divide.",
+        "data": {
+          "context": "Example",
+          "startLine": 1,
+          "endLine": 5,
+          "controlFlowIndicators": [
+            "return"
+          ],
+          "suspiciousConstructs": [
+            "API call"
+          ]
+        }
+      },
+      {
+        "timestamp": "2026-06-26T12:51:37.5325098+00:00",
+        "step": "source.methods.extracted",
+        "message": "Extracted candidate method/function regions.",
+        "data": {
+          "count": 1
+        }
+      },
+      {
+        "timestamp": "2026-06-26T12:51:37.5574465+00:00",
+        "step": "failing-output.parsed",
+        "message": "Extracted stack traces, compiler diagnostics, files, methods, lines, and error types.",
+        "data": {
+          "stackTraceFrames": [
+            {
+              "fileName": "Example.java",
+              "methodName": "Example.divide",
+              "lineNumber": 3,
+              "raw": "at Example.divide(Example.java:3)"
+            }
+          ],
+          "compilerErrors": [],
+          "warnings": [],
+          "fileNames": [
+            "Example.java"
+          ],
+          "methodNames": [
+            "divide"
+          ],
+          "lineNumbers": [
+            3
+          ],
+          "errorTypes": [
+            "java.lang.NullPointerException"
+          ]
+        }
+      }
+    ]
+  },
+  "ranking": {
+    "normalizedWeights": {
+      "sourceContext": 0.4444,
+      "failingOutput": 0.3333,
+      "bugReport": 0.2222,
+      "revisionHistory": 0
+    },
+    "rankedMethods": [
+      {
+        "method": {
+          "name": "divide",
+          "context": "Example",
+          "startLine": 1,
+          "endLine": 5,
+          "source": "public class Example {\r\n    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }\r\n}",
+          "localContext": "public class Example {\r\n    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }\r\n}",
+          "controlFlowIndicators": [
+            "return"
+          ],
+          "suspiciousConstructs": [
+            "API call"
+          ]
+        },
+        "sourceCodeScore": 1,
+        "stackTraceScore": 1,
+        "bugReportScore": 1,
+        "revisionHistoryScore": 1,
+        "finalSuspiciousnessScore": 0.9999,
+        "explanation": "source contains 1 suspicious constructs and 1 control-flow indicators; failing output overlaps by method name, file context, line range, or error type; reported failing line falls inside the candidate interval."
+      }
+    ]
+  },
+  "selectedMethod": {
+    "method": {
+      "name": "divide",
+      "context": "Example",
+      "startLine": 1,
+      "endLine": 5,
+      "source": "public class Example {\r\n    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }\r\n}",
+      "localContext": "public class Example {\r\n    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }\r\n}",
+      "controlFlowIndicators": [
+        "return"
+      ],
+      "suspiciousConstructs": [
+        "API call"
+      ]
+    },
+    "sourceCodeScore": 1,
+    "stackTraceScore": 1,
+    "bugReportScore": 1,
+    "revisionHistoryScore": 1,
+    "finalSuspiciousnessScore": 0.9999,
+    "explanation": "source contains 1 suspicious constructs and 1 control-flow indicators; failing output overlaps by method name, file context, line range, or error type; reported failing line falls inside the candidate interval."
+  },
+  "reasoning": {
+    "rootCause": "",
+    "patchJson": "",
+    "selfConsistency": "",
+    "explanation": "",
+    "exchanges": []
+  },
+  "finalValidation": {
+    "passed": false,
+    "checks": [],
+    "refinementInstruction": "",
+    "patchApplication": {
+      "applied": false,
+      "originalCode": "",
+      "patchedCode": "",
+      "unifiedDiff": "",
+      "targetMethod": "",
+      "messages": [],
+      "changedRanges": []
+    }
+  },
+  "refinementIterations": [],
+  "trace": [
+    {
+      "timestamp": "2026-06-26T12:51:37.4820609+00:00",
+      "stage": "start",
+      "message": "Repair pipeline started."
+    },
+    {
+      "timestamp": "2026-06-26T12:51:37.557674+00:00",
+      "stage": "preprocessing",
+      "message": "Extracted 1 candidate method/function artifact(s)."
+    },
+    {
+      "timestamp": "2026-06-26T12:51:37.5648103+00:00",
+      "stage": "ranking",
+      "message": "Computed artifact-aware Weighted Borda ranking and selected top 1 candidate(s)."
+    },
+    {
+      "timestamp": "2026-06-26T12:51:37.5969827+00:00",
+      "stage": "llm-error",
+      "message": "root-cause LLM call failed: OPENAI_API_KEY is not set. Chain-of-Repair requires a real OpenAI API key and will not fall back to canned responses."
+    }
+  ],
+  "finalStatus": "llm-error",
+  "logPath": "",
+  "logDirectory": "C:\\Users\\Administrator\\OneDrive - sdu.edu.tr\\Belgeler\\CoR\\logs\\runs\\72251a5e8d7141e58ee2f389fa661c3a",
+  "usedRealLlmClient": true,
+  "mockClientUsed": false,
+  "llmClientName": "OpenAiLLMClient",
+  "modelName": "gpt-4o",
+  "promptTemplatesUsed": [
+    "C:\\Users\\Administrator\\OneDrive - sdu.edu.tr\\Belgeler\\CoR\\prompts\\root_cause.md"
+  ],
+  "errorMessage": "root-cause LLM call failed: OPENAI_API_KEY is not set. Chain-of-Repair requires a real OpenAI API key and will not fall back to canned responses."
+}

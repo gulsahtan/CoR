@@ -1,0 +1,70 @@
+# Root-Cause Analysis
+
+Analyze the localized method/function and all supplied artifacts. Use the failing output, stack trace frames, compiler diagnostics, optional bug description, source context, and ranked method metadata as evidence.
+
+Return only strict JSON with this shape:
+
+{
+  "faultCategory": "short category name",
+  "rootCause": "specific causal explanation",
+  "evidence": ["artifact-grounded evidence item"],
+  "localizedMethod": "context.method",
+  "confidence": 0.0
+}
+
+
+INPUT ARTIFACT JSON:
+{
+  "language": "C",
+  "localizedMethod": {
+    "name": "divide",
+    "context": "Example.java",
+    "startLine": 2,
+    "endLine": 4,
+    "source": "    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }",
+    "localContext": "public class Example {\r\n    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }\r\n}",
+    "controlFlowIndicators": [
+      "return"
+    ],
+    "suspiciousConstructs": [
+      "API call"
+    ]
+  },
+  "sourceCodeContext": "public class Example {\r\n    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }\r\n}",
+  "failingOutput": "java.lang.NullPointerException\r\n\tat Example.divide(Example.java:3)",
+  "stackTraceFrames": [
+    {
+      "fileName": "Example.java",
+      "methodName": "Example.divide",
+      "lineNumber": 3,
+      "raw": "at Example.divide(Example.java:3)"
+    }
+  ],
+  "compilerErrors": [],
+  "compilerWarnings": [],
+  "bugDescription": "Division fails when input is null or zero.",
+  "rankedMethodMetadata": [
+    {
+      "method": {
+        "name": "divide",
+        "context": "Example.java",
+        "startLine": 2,
+        "endLine": 4,
+        "source": "    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }",
+        "localContext": "public class Example {\r\n    public int divide(Integer value) {\r\n        return 10 / value;\r\n    }\r\n}",
+        "controlFlowIndicators": [
+          "return"
+        ],
+        "suspiciousConstructs": [
+          "API call"
+        ]
+      },
+      "sourceCodeScore": 1,
+      "stackTraceScore": 1,
+      "bugReportScore": 1,
+      "revisionHistoryScore": 1,
+      "finalSuspiciousnessScore": 0.9999,
+      "explanation": "source contains 1 suspicious constructs and 1 control-flow indicators; failing output overlaps by method name, file context, line range, or error type; reported failing line falls inside the candidate interval."
+    }
+  ]
+}
