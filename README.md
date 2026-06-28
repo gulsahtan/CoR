@@ -378,3 +378,11 @@ Contributions should preserve reproducibility. In particular:
 - keep prompt templates in `prompts/`,
 - keep logs sufficient to reproduce each repair run,
 - add or update tests for changes to parsing, ranking, LLM orchestration, patch application, validation, or logging.
+
+## License
+
+All Rights Reserved © 2026 Fatma Gülşah Tan
+
+This repository is publicly available solely to support research transparency and the peer-review process.
+
+No permission is granted to copy, modify, redistribute, or use any part of this repository without prior written permission from the copyright holder.
