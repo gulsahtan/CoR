@@ -2,7 +2,6 @@
 
 Chain-of-Repair (CoR) is a C#/.NET AI Application for artifact-aware automated program repair. It combines source-code parsing, failing-output analysis, suspicious-method ranking, LLM-driven root-cause analysis, LLM-driven patch synthesis, static validation, bounded LLM refinement, and reproducibility logging.
 
-This repository is intended to accompany a PeerJ Computer Science AI Application submission. It provides the code, prompt templates, sample inputs, dataset provenance notes, and execution instructions needed for review and reproduction.
 
 ## Description
 
@@ -34,7 +33,7 @@ The production pipeline uses real LLM calls through `OpenAiLLMClient`. It does n
 
 ## Article Type and Reproducibility Context
 
-This project is documented as an AI Application artifact rather than a conventional research article artifact. The repository addresses the PeerJ AI Application requirements by providing:
+This project is documented as an AI Application artifact rather than a conventional research article artifact. 
 
 - algorithms and code used to implement the system,
 - a plain-text README with implementation steps,
@@ -45,7 +44,6 @@ This project is documented as an AI Application artifact rather than a conventio
 - tests and reproducibility logs,
 - license information.
 
-For a single-author submission, the author should confirm in PeerJ's Confidential Information for PeerJ Staff whether the single-author listing is intentional. If additional contributors should be listed, update the manuscript and PeerJ author declaration before resubmission.
 
 ## Repository Contents
 
@@ -348,7 +346,7 @@ These logs are intended to demonstrate that prompts and responses are generated 
 
 ## Code and Data Availability
 
-For PeerJ review and publication, provide this repository as one of the following:
+For review and publication, provide this repository as one of the following:
 
 - a DOI-linked public repository, such as Zenodo archived from GitHub, or
 - a supplemental file with a descriptive legend that includes the term `code` and is marked as the appropriate file type in the submission system.
