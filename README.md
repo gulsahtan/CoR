@@ -1,324 +1,901 @@
-# Chain-of-Repair (CoR) AI Application
 
-Chain-of-Repair (CoR) is a C#/.NET AI Application for artifact-aware automated program repair. It combines source-code parsing, failing-output analysis, suspicious-method ranking, LLM-driven root-cause analysis, LLM-driven patch synthesis, static validation, bounded LLM refinement, and reproducibility logging.
+# Chain-of-Repair (CoR)
 
+**An Artifact-Aware Multi-Stage Reasoning Framework for Fault Localization and Program Repair with Large Language Models**
 
-## Description
+Chain-of-Repair (CoR) is a research-oriented automated fault localization and program repair framework implemented in **C# 13 and .NET 9**, with an ASP.NET Core web application and a command-line interface.
 
-CoR accepts:
+CoR integrates artifact-aware method ranking, structured LLM reasoning, diagnosis-conditioned patch generation, conservative validation, bounded refinement and developer-oriented explanations.
 
-- source code,
-- failing test output, compiler output, or stack trace text,
-- an optional bug description,
-- a programming language selection,
-- and a Top-K localization depth.
+The framework operates **without executing benchmark tests during fault localization, diagnosis, patch generation or candidate validation**. Benchmark tests are used separately, after repair termination, to assess retrospective correctness.
 
-For each repair request, CoR executes the following production pipeline:
+> **Important:** A framework-plausible patch passes CoR's configured validation checks but is not necessarily functionally correct. Retrospective test passing provides additional behavioral evidence without establishing complete functional correctness.
 
-1. Parse the input source code.
-2. Extract candidate methods or functions.
-3. Parse failing output, compiler diagnostics, stack trace frames, and optional bug description.
-4. Rank candidate methods using artifact-aware Weighted Borda Count.
-5. Select the Top-K suspicious methods and localize the highest-ranked method.
-6. Send the localized method and artifacts to the LLM for root-cause analysis.
-7. Send the root-cause JSON back to the LLM for patch synthesis.
-8. Apply the LLM-generated unified diff to the original source code.
-9. Validate the patched code without running tests.
-10. If validation fails, send the validation failures back to the LLM for refinement.
-11. Repeat refinement for at most three iterations.
-12. Generate an LLM-based developer explanation.
-13. Save prompts, responses, patches, validation results, and final status under `logs/runs/{runId}/`.
+## Table of Contents
 
-The production pipeline uses real LLM calls through `OpenAiLLMClient`. It does not use hard-coded root causes, canned patches, placeholder diffs, or silent fallback responses. If `OPENAI_API_KEY` is missing or the OpenAI call fails, the application returns a clear error to the UI and logs.
+1. [Overview](#overview)
+2. [System Architecture](#system-architecture)
+3. [Artifact-Aware Fault Localization](#artifact-aware-fault-localization)
+4. [Multi-Stage Reasoning](#multi-stage-reasoning)
+5. [Patch Validation and Refinement](#patch-validation-and-refinement)
+6. [Repository Structure](#repository-structure)
+7. [Requirements](#requirements)
+8. [Installation](#installation)
+9. [Running the Web Application](#running-the-web-application)
+10. [Running the CLI](#running-the-cli)
+11. [Running Project Tests](#running-project-tests)
+12. [Experimental Evaluation](#experimental-evaluation)
+13. [Reproducibility and Experiment Artifacts](#reproducibility-and-experiment-artifacts)
+14. [Logging and Outputs](#logging-and-outputs)
+15. [Limitations](#limitations)
+16. [Data Availability and Citation](#data-availability-and-citation)
+17. [License](#license)
 
-## Article Type and Reproducibility Context
+---
 
-This project is documented as an AI Application artifact rather than a conventional research article artifact. 
+## Overview
 
-- algorithms and code used to implement the system,
-- a plain-text README with implementation steps,
-- dataset source information,
-- code structure and usage instructions,
-- computing infrastructure details,
-- preprocessing and methodology notes,
-- tests and reproducibility logs,
-- license information.
+CoR addresses fault localization and automated program repair in software environments where executable test suites may be incomplete, outdated, expensive or unavailable during the repair process.
 
+The framework combines four categories of software artifacts:
 
-## Repository Contents
+- Source-code context
+- Stack traces and permitted diagnostic information
+- Bug reports and natural-language defect descriptions
+- Revision history, when available
+
+These artifacts support method-level fault localization and guide subsequent repair decisions.
+
+CoR follows four primary reasoning stages:
+
+**DIAGNOSE → PATCH → CHECK → EXPLAIN**
+
+Candidate patches are evaluated using compilation or syntax checks, differential static analysis, local semantic constraints and diagnosis–patch consistency assessment.
+
+Rejected candidates may undergo bounded refinement.
+
+The framework distinguishes between:
+
+- **Framework-plausible repair:** A patch satisfying the configured non-test acceptance criteria.
+- **Retrospectively test-passing repair:** A final patch passing benchmark-provided tests after the repair process terminates.
+
+CoR does not require task-specific model training or fine-tuning.
+
+---
+
+## System Architecture
+
+The framework consists of three interconnected modules:
+
+1. Localization Module
+2. Reasoning Module
+3. Validation Module
+
+### End-to-End Workflow
+
+```text
+Buggy Program Revision
+         |
+         v
+Available Software Artifacts
+(Source Code, Stack Trace, Bug Report, History)
+         |
+         v
+Candidate Method Extraction
+         |
+         v
+Artifact-Specific Scoring
+         |
+         v
+Weighted Borda Rank Aggregation
+         |
+         v
+Top-K Suspicious Methods
+         |
+         v
++-----------------------------+
+| DIAGNOSE                    |
+| Structured Root-Cause       |
+| Analysis                    |
++-----------------------------+
+         |
+         v
++-----------------------------+
+| PATCH                       |
+| Diagnosis-Conditioned       |
+| Patch Generation            |
++-----------------------------+
+         |
+         v
++-----------------------------+
+| CHECK                       |
+| Diagnosis-Patch Consistency |
++-----------------------------+
+         |
+         v
++-----------------------------+
+| VALIDATION                  |
+| Patch Integrity             |
+| Compilation / Syntax        |
+| Differential Static Checks  |
+| Local Semantic Constraints  |
++-----------------------------+
+         |
+         v
+   Candidate Accepted?
+      /          \
+    Yes           No
+     |             |
+     v             v
+  EXPLAIN      Refinement
+     |         (Max. 3)
+     |             |
+     |       Revalidate
+     v
+Framework-Plausible Patch
+         |
+         v
+Repair Process Terminates
+         |
+         v
+Retrospective Benchmark Testing
+         |
+         v
+Final Evaluation Results
+```
+
+### Execution Protocol
+
+The experimental protocol specifies:
+
+| Parameter | Value |
+|---|---|
+| Maximum selected methods | Top-K = 5 |
+| Initial patch attempts | 1 per selected method |
+| Maximum refinements | 3 per selected method |
+| Maximum patch evaluations | 4 per selected method |
+| Maximum LLM calls | 20 per defect |
+| Maximum total inference tokens | 16,000 per defect |
+| Maximum output tokens | 2,048 per model call |
+| Temperature | 0.2 |
+| LLM family | GPT-4o |
+
+The model-call and token limits are cumulative across the repair operations for each defect.
+
+The per-method refinement budget and global inference budget are distinct constraints. The effective termination behavior depends on both.
+
+---
+
+## Artifact-Aware Fault Localization
+
+CoR performs fault localization at the method level.
+
+Let:
+
+- `M` denote the candidate methods.
+- `A` denote the available artifact types.
+- `s_a(m)` denote the artifact-specific suspiciousness score.
+- `r_a(m)` denote the descending rank of method `m` under artifact `a`.
+
+### Source-Code Evidence
+
+Source-code suspiciousness is computed from five binary static indicators:
+
+1. Boundary-condition sensitivity
+2. Null-sensitive dereferencing
+3. Potentially unsafe index access
+4. Exceptional control-flow handling
+5. Conditional-logic inconsistency
+
+The source-code score is the arithmetic mean of these indicators.
+
+### Stack-Trace Evidence
+
+For a method appearing at stack-frame position `j`:
+
+```text
+trace_score(m) = 1 / j
+```
+
+Unmatched methods receive zero.
+
+Method matching uses available class and signature information to resolve ambiguous references.
+
+### Bug-Report Evidence
+
+Bug-report relevance is calculated using TF–IDF cosine similarity between normalized bug-report text and method-related source context.
+
+Preprocessing includes:
+
+- Lowercase normalization
+- CamelCase segmentation
+- Underscore-separated identifier tokenization
+- Method signature extraction
+- Comment and surrounding class-context extraction
+
+Vocabulary and inverse-document-frequency statistics are computed within each buggy revision.
+
+### Revision-History Evidence
+
+When reliable revision-history information is available, method-level change history is represented using exponentially decayed historical modifications.
+
+```text
+history_score(m) =
+    sum(exp(-lambda * delta_t))
+```
+
+The score is normalized relative to the maximum nonzero history score among candidate methods.
+
+History evidence is excluded when commit information cannot be reliably mapped to methods.
+
+### Weighted Borda Aggregation
+
+For `N > 1`, normalized Borda contribution is:
+
+```text
+phi(r) = (N - r) / (N - 1)
+```
+
+For a single candidate method:
+
+```text
+phi(1) = 1
+```
+
+The final method score is:
+
+```text
+S(m) = sum(w_normalized[a] * phi(r_a(m)))
+```
+
+Default artifact weights:
+
+| Artifact | Weight |
+|---|---:|
+| Source code | 0.40 |
+| Stack trace | 0.30 |
+| Bug report | 0.20 |
+| Revision history | 0.10 |
+
+Unavailable artifacts are excluded and the remaining weights are normalized to sum to one.
+
+Equal artifact scores receive the average occupied rank. Equal aggregate scores are resolved by source-code rank and then by lexicographic fully qualified method signature.
+
+The default weights are heuristic priorities rather than learned reliability estimates.
+
+---
+
+## Multi-Stage Reasoning
+
+The Reasoning Module uses structured LLM operations to connect fault localization, diagnosis, patch synthesis and explanation generation.
+
+### Stage 1: DIAGNOSE
+
+Inputs:
+
+- Selected suspicious method
+- Method signature and source context
+- Available diagnostic artifacts
+- Normalized failure description
+
+Outputs:
+
+- Suspected fault category
+- Relevant statement or code region
+- Inferred defect mechanism
+- Supporting evidence
+- Confidence information
+
+The resulting structured diagnosis is passed to patch synthesis.
+
+### Stage 2: PATCH
+
+Inputs:
+
+- Original method
+- Structured diagnosis
+- Applicable scope constraints
+- Interface-preservation requirements
+
+Outputs:
+
+- Candidate unified diff
+- Edited method
+- Patch rationale
+- Expected correction mechanism
+
+The generated modification is restricted to the permitted repair scope.
+
+### Stage 3: CHECK
+
+Inputs:
+
+- Original method
+- Diagnosis
+- Proposed patch
+- Supporting artifacts
+
+Outputs:
+
+- Diagnosis–patch consistency judgment
+- Fault–patch alignment judgment
+- Constraint violations
+- Refinement feedback
+
+The LLM-generated judgment is combined with deterministic validation.
+
+A positive consistency judgment alone does not establish functional correctness.
+
+### Stage 4: EXPLAIN
+
+The EXPLAIN operation runs only after candidate acceptance.
+
+It produces a developer-oriented explanation containing:
+
+- Suspected root cause
+- Applied code modification
+- Supporting evidence
+- Validation summary
+- Expected effect of the repair
+
+Explanation generation does not override failed validation decisions.
+
+### Prompt Templates
+
+The previously documented runtime prompt templates are located in:
+
+```text
+prompts/
+  root_cause.md
+  patch_synthesis.md
+  self_consistency.md
+  refinement.md
+  explanation.md
+```
+
+The conceptual DIAGNOSE, PATCH, CHECK and EXPLAIN stages correspond to the appropriate runtime prompt templates.
+
+---
+
+## Patch Validation and Refinement
+
+CoR validates generated patches without executing benchmark tests during the repair process.
+
+### Patch Integrity and Scope
+
+Candidate patches are checked for:
+
+- Valid unified diff structure
+- Successful patch application
+- Modifications within the permitted method scope
+- Preservation of required interfaces
+- Absence of unrelated changes
+
+### Compilation and Syntax Validation
+
+Applicable language-specific tools include:
+
+| Language | Validation |
+|---|---|
+| Java | Project compilation |
+| Python | Python syntax compilation |
+| C | Compiler or syntax checks |
+| C# | Configured build or syntax checks |
+
+### Differential Static Analysis
+
+The experimental validation protocol specifies:
+
+- Java: SpotBugs
+- C: clang-tidy
+- Python: syntax compilation with applicable additional checks
+
+Original and patched revisions are analyzed using identical configurations.
+
+Pre-existing warnings do not automatically cause rejection. Newly introduced or worsened findings may trigger rejection according to the configured validation policy.
+
+### Lightweight Semantic Constraints
+
+The framework checks for issues such as:
+
+- Unrelated method modifications
+- Unsupported interface changes
+- Unresolved symbols
+- Null-safety violations
+- Boundary-condition violations
+- Control-flow inconsistencies
+
+### Iterative Refinement
+
+When a candidate fails validation:
+
+1. Validation feedback is collected.
+2. The original diagnosis is preserved.
+3. The previous patch and rejection reasons are supplied to PATCH.
+4. A revised candidate is generated.
+5. The complete applicable validation procedure is repeated.
+
+Up to three refinement iterations are permitted per selected method.
+
+If the candidate remains unacceptable, the framework may continue with the next ranked method, subject to the global inference budget.
+
+### Test Isolation
+
+Benchmark-provided test suites and reference patches must not influence:
+
+- Fault localization
+- Diagnosis
+- Patch generation
+- CHECK
+- Candidate selection
+- Refinement
+
+Benchmark tests are executed only after repair termination.
+
+---
+
+## Repository Structure
+
+The previously documented project structure is:
 
 ```text
 ChainOfRepair.sln
-src/
-  ChainOfRepair.Core/       Core parsing, ranking, LLM orchestration, patching, validation, diagnostics
-  ChainOfRepair.Web/        ASP.NET Core Razor Pages user interface
-  ChainOfRepair.Cli/        Batch CLI runner for benchmark-style cases
-tests/
-  ChainOfRepair.Tests/      Dependency-light test runner
-prompts/                    Runtime LLM prompt templates
-docs/
-  datasets.md               Dataset provenance and conversion notes
-sample_inputs/              Small runnable example inputs
-sample_outputs/             Example output location
-logs/                       Runtime experiment logs
-LICENSE                     MIT license
+|
++-- src/
+|   +-- ChainOfRepair.Core/
+|   |   +-- Parsing/
+|   |   |   +-- ArtifactParsers.cs
+|   |   +-- Ranking/
+|   |   |   +-- WeightedBordaRanker.cs
+|   |   +-- Reasoning/
+|   |   |   +-- LlmReasoning.cs
+|   |   +-- Validation/
+|   |   |   +-- PatchApplicationService.cs
+|   |   |   +-- ValidationEngine.cs
+|   |   +-- Pipeline/
+|   |   |   +-- RepairPipeline.cs
+|   |   +-- Models/
+|   |       +-- CoRModels.cs
+|   |
+|   +-- ChainOfRepair.Web/
+|   +-- ChainOfRepair.Cli/
+|
++-- tests/
+|   +-- ChainOfRepair.Tests/
+|
++-- prompts/
++-- docs/
+|   +-- datasets.md
++-- sample_inputs/
++-- sample_outputs/
++-- logs/
+|   +-- runs/
++-- LICENSE
 ```
 
-## Code Information
+The Core project contains the main localization, reasoning, patching, validation and orchestration components.
 
-The main implementation is in `src/ChainOfRepair.Core`:
+The Web project provides the browser-based interface.
 
-- `Parsing/ArtifactParsers.cs`: language-aware source and failing-output parsing.
-- `Ranking/WeightedBordaRanker.cs`: artifact-aware Weighted Borda Count ranking.
-- `Reasoning/LlmReasoning.cs`: `ILLMClient`, `OpenAiLLMClient`, prompt-template loading, and LLM stage orchestration.
-- `Validation/PatchApplicationService.cs`: unified diff parsing and application to the original source code.
-- `Validation/ValidationEngine.cs`: syntax/compile checks, differential static validation, and causal alignment validation.
-- `Pipeline/RepairPipeline.cs`: end-to-end repair pipeline and run logging.
-- `Models/CoRModels.cs`: request, ranking, LLM, validation, and pipeline result models.
+The CLI project supports command-line execution and batch-oriented workflows.
 
-The web app is in `src/ChainOfRepair.Web`, and the command-line runner is in `src/ChainOfRepair.Cli`.
-
-## Dataset Information
-
-This repository contains a small sample case in `sample_inputs/` for smoke testing. Larger benchmark experiments can be prepared from third-party automated program repair datasets. If any of these datasets are used in the manuscript experiments, cite their original sources in the Materials & Methods section and follow their licenses.
-
-Third-party dataset sources:
-
-- Defects4J: https://defects4j.org/ and https://github.com/rjust/defects4j
-- QuixBugs: https://github.com/jkoppel/QuixBugs
-- IntroClass: https://github.com/ProgramRepair/IntroClass
-
-Dataset conversion format expected by the CLI:
-
-```text
-case-id/
-  source.java | source.py | source.c | source.cs
-  failing.txt
-  bug.txt
-```
-
-`source.*` contains the buggy program or extracted source file. `failing.txt` contains failing test output, compiler output, or stack traces. `bug.txt` is optional and contains a natural-language bug description.
-
-## Data Preprocessing
-
-CoR does not require model training or dataset-specific feature precomputation. Preprocessing is performed at runtime for each input case:
-
-1. Normalize source text into line-indexed form.
-2. Extract candidate method/function regions using language-specific parsers.
-3. Extract stack trace frames, compiler diagnostics, file names, method names, line numbers, and error types from failing output.
-4. Detect local source-code signals such as null checks, boundary conditions, exception handling, type conversion, API calls, and memory/resource-management patterns.
-5. Compute artifact-aware ranking features.
-6. Serialize the selected method, source context, failing artifacts, and ranking metadata into LLM prompts.
-
-If a benchmark dataset is converted manually into the `source.*`, `failing.txt`, and `bug.txt` layout, the conversion procedure and original dataset IDs should be reported in the manuscript.
-
-## Methodology
-
-### Localization
-
-CoR ranks candidate methods/functions with a Weighted Borda Count aggregation:
-
-```text
-S_total(m) = Sum_i(w_i * phi_i(rank_i(m)))
-```
-
-Default artifact weights are:
-
-- source-code context: `0.40`,
-- failing output and stack trace: `0.30`,
-- bug report: `0.20`,
-- revision history placeholder: `0.10`.
-
-If an artifact is missing, the available artifact weights are normalized to sum to one.
-
-### LLM Stages
-
-The runtime prompt templates are loaded from `prompts/`:
-
-- `root_cause.md`
-- `patch_synthesis.md`
-- `self_consistency.md`
-- `refinement.md`
-- `explanation.md`
-
-The LLM stages are:
-
-1. Root-cause analysis: returns structured JSON with `faultCategory`, `rootCause`, `evidence`, `localizedMethod`, and `confidence`.
-2. Patch synthesis: returns structured JSON with `patchType`, `targetMethod`, `changedLinesRationale`, `unifiedDiff`, and `expectedEffect`.
-3. Self-consistency checking: returns structured JSON assessing causal alignment and scope.
-4. Refinement: returns a corrected patch JSON when validation fails.
-5. Developer explanation: returns a grounded explanation of the final repair result.
-
-### Patch Application and Validation
-
-CoR applies the generated unified diff to the original source code and records:
-
-- original source code,
-- patched source code,
-- final unified diff,
-- changed line ranges,
-- application messages.
-
-Validation is performed on the patched code, not dummy strings. It includes:
-
-- syntax or compilation validation using available tools,
-- differential static validation for newly introduced issues,
-- causal alignment validation to check whether changes stay inside the localized method/function and match the inferred root cause.
-
-The application does not run the project's tests during repair generation. Validation is intentionally static or compile/syntax based.
-
-## Computing Infrastructure
-
-The application was developed and evaluated using the following computing environment:
-
-- Operating System: Microsoft Windows 10 (64-bit)
-- CPU: Intel Core i7-11700F (8 cores, 16 threads)
-- GPU: NVIDIA GeForce RTX 3070 (8 GB GDDR6)
-- Memory: 32 GB RAM
-- Runtime: .NET 9 SDK
-- Programming Language: C# 13
-- Web Framework: ASP.NET Core Razor Pages
-- AI Integration: Official OpenAI .NET SDK
-- Optional External Compilers:
-  - Java: `javac`
-  - Python: `python` / `python3`
-  - C: `gcc` or `clang`
-
-Internet connectivity is required only for live OpenAI API calls. Runtime diagnostics, including operating system, CPU architecture, .NET version, compiler configuration, model settings, and execution logs, are available through the Diagnostics page of the application.
+---
 
 ## Requirements
 
-Required:
+### Required Software
 
 - .NET 9 SDK
-- An OpenAI API key in the `OPENAI_API_KEY` environment variable for live repair runs
+- OpenAI API access
+- Internet connectivity for live LLM calls
 
-Optional validation tools:
+### Optional Language Tools
 
-- Java: `javac`
-- Python: `python` or `python3`
-- C: `gcc` or `clang`
-- C#: optional build/syntax wrapper configured through `COR_CSHARP_BUILD`
+- Java Development Kit (`javac`)
+- Python (`python` or `python3`)
+- GCC or Clang for C
+- SpotBugs
+- clang-tidy
+- Additional project-specific build dependencies
 
-Environment variables:
+Static-analysis availability and configuration may affect the validation outcome.
 
-- `OPENAI_API_KEY`: OpenAI API key. Required for production LLM calls.
-- `COR_OPENAI_MODEL`: optional model override. Default: `gpt-4o`.
-- `COR_JAVA_COMPILER`: optional path to `javac`.
-- `COR_PYTHON`: optional path to `python` or `python3`.
-- `COR_C_COMPILER`: optional path to `gcc` or `clang`.
-- `COR_CSHARP_BUILD`: optional path to a C# syntax/build wrapper.
+### Computing Environment
 
-The default web configuration is:
+The manuscript reports the following environment:
 
-```json
-{
-  "LLM": {
-    "Provider": "OpenAI",
-    "Model": "gpt-4o",
-    "Temperature": 0.2,
-    "MaxTokens": 2048,
-    "UseMockClient": false
-  }
-}
-```
+| Component | Specification |
+|---|---|
+| Operating system | Windows 10, 64-bit |
+| Processor | Intel Core i7-11700F |
+| CPU cores / threads | 8 / 16 |
+| Memory | 32 GB |
+| GPU | NVIDIA GeForce RTX 3070, 8 GB |
+| Runtime | .NET 9 |
+| Programming language | C# 13 |
+| Web framework | ASP.NET Core |
+| LLM integration | OpenAI API |
 
-`UseMockClient` is disabled by default. Demo/mock mode is not valid for reproducibility.
+LLM inference is performed through the OpenAI API.
+
+Local resources are used for orchestration, parsing, compilation and applicable static-analysis operations.
+
+---
 
 ## Installation
 
-From the repository root:
+### 1. Clone the Repository
 
-```powershell
+```bash
+git clone https://github.com/gulsahtan/CoR.git
+cd CoR
+```
+
+### 2. Restore Dependencies
+
+```bash
 dotnet restore ChainOfRepair.sln
+```
+
+### 3. Build the Solution
+
+```bash
 dotnet build ChainOfRepair.sln
 ```
 
-Set the OpenAI key for the current PowerShell session:
+### 4. Configure the OpenAI API Key
+
+For Windows PowerShell:
 
 ```powershell
 $env:OPENAI_API_KEY = "your-openai-api-key"
 ```
 
-Or set it persistently on Windows:
+To save the variable persistently:
 
 ```powershell
 setx OPENAI_API_KEY "your-openai-api-key"
 ```
 
-Restart the terminal or application after using `setx`.
+Restart the terminal after using `setx`.
 
-## Usage Instructions
+Never commit API keys or credentials to the repository.
 
-### Web Application
+### 5. Optional Environment Variables
 
-```powershell
+```text
+OPENAI_API_KEY
+COR_OPENAI_MODEL
+COR_JAVA_COMPILER
+COR_PYTHON
+COR_C_COMPILER
+COR_CSHARP_BUILD
+```
+
+These variables configure model selection and language-specific tooling.
+
+The previously documented default model alias is `gpt-4o`.
+
+For experimental reproducibility, use and record an exact model snapshot rather than relying only on a moving alias.
+
+---
+
+## Running the Web Application
+
+Start the application:
+
+```bash
 dotnet run --project src/ChainOfRepair.Web/ChainOfRepair.Web.csproj
 ```
 
-Open the local URL printed by ASP.NET Core. The main page provides fields for:
+Open the local address displayed by ASP.NET Core.
 
-- source code,
-- failing test or compile output,
-- bug description,
-- language,
-- Top-K.
+The web interface supports input fields for:
 
-After a run, the UI displays:
+- Programming language
+- Source code
+- Bug description
+- Optional diagnostic information
+- Top-K localization depth
 
-- real/mock LLM client status,
-- selected model name,
-- prompt templates used,
-- root-cause JSON,
-- patch JSON,
-- self-consistency result,
-- validation failures,
-- refinement prompts and outputs,
-- final patched source code,
-- final unified diff,
-- final developer explanation,
-- run log location.
+The general-purpose application can accept diagnostic or failure text. For benchmark experiments, only artifacts permitted by the corresponding experimental protocol should be supplied.
 
-### Command-Line Interface
+### Repair Execution
 
-```powershell
+After submitting a repair request, the application executes the configured localization and repair pipeline.
+
+The interface can display:
+
+- Ranked suspicious methods
+- Root-cause analysis
+- Candidate patch
+- Consistency assessment
+- Validation results
+- Refinement attempts
+- Final patched source code
+- Unified diff
+- Developer explanation
+- Run-log location
+
+An accepted patch should be interpreted as framework-plausible unless independently evaluated for behavioral correctness.
+
+---
+
+## Running the CLI
+
+The previously documented command-line invocation is:
+
+```bash
 dotnet run --project src/ChainOfRepair.Cli/ChainOfRepair.Cli.csproj -- --input sample_inputs --output sample_outputs --language Java --topk 5
 ```
 
-Expected output:
+### Input Format
 
-- one JSON export per benchmark case,
-- `summary.csv`,
-- detailed run logs under the selected output folder.
+The documented sample-case structure is:
 
-### Tests
+```text
+case-id/
+  source.java
+  bug.txt
+  failing.txt
+```
 
-```powershell
+The source filename may use a supported language extension such as `.java`, `.py` or `.c`.
+
+`bug.txt` contains an optional natural-language defect description.
+
+`failing.txt` contains optional diagnostic information. It must not contain benchmark test-oracle information when executing the test-constrained research protocol.
+
+### CLI Outputs
+
+The documented CLI outputs include:
+
+- Per-case JSON results
+- `summary.csv`
+- Detailed run logs
+- Generated patches
+- Validation outcomes
+
+The sample CLI command is intended for application testing. Reproducing the complete benchmark evaluation requires the corresponding benchmark manifests, experimental configurations and evaluation scripts.
+
+---
+
+## Running Project Tests
+
+Execute the documented project test runner:
+
+```bash
 dotnet run --project tests/ChainOfRepair.Tests/ChainOfRepair.Tests.csproj
 ```
 
-The test runner covers:
+The test suite is intended to verify implementation behavior, including:
 
-- production DI registration of `OpenAiLLMClient`,
-- clear failure when `OPENAI_API_KEY` is missing,
-- dynamic prompt construction for different inputs,
-- absence of canned patches,
-- patch application to actual source code,
-- validation on patched code,
-- validation-error feedback during refinement,
-- three-iteration refinement budget,
-- per-stage run log creation,
-- parser and ranking behavior.
+- Parsing and method extraction
+- Artifact ranking
+- Prompt construction
+- LLM-client configuration
+- Missing API-key handling
+- Patch application
+- Validation logic
+- Refinement limits
+- Run logging
 
-## Reproducibility Logs
+These implementation tests are separate from retrospective benchmark correctness evaluation.
 
-Every run writes logs under:
+---
+
+## Experimental Evaluation
+
+The accompanying manuscript evaluates CoR on three established program repair benchmarks.
+
+### Benchmark Datasets
+
+| Dataset | Language | Defects |
+|---|---|---:|
+| Defects4J v1.2 | Java | 150 |
+| QuixBugs | Java / Python | 40 |
+| IntroClass | C | 150 |
+| **Total** | | **340** |
+
+Dataset sources:
+
+- Defects4J: https://github.com/rjust/defects4j
+- QuixBugs: https://github.com/jkoppel/QuixBugs
+- IntroClass: https://github.com/ProgramRepair/IntroClass
+
+The 150 Defects4J defects are selected using a fixed experimental manifest.
+
+### Fault Localization and Repair Results
+
+The manuscript reports:
+
+| Dataset | Top-1 | Top-5 | Framework-Plausible | Test-Passing |
+|---|---:|---:|---:|---:|
+| Defects4J | 69/150 | 107/150 | 47/150 | 27/150 |
+| QuixBugs | 13/40 | 23/40 | 22/40 | 13/40 |
+| IntroClass | 87/150 | 120/150 | 99/150 | 72/150 |
+| **Total** | **169/340** | **250/340** | **168/340** | **112/340** |
+
+Overall reported results:
+
+- Top-1 localization accuracy: **49.7%**
+- Top-5 localization accuracy: **73.5%**
+- Framework-plausible repair rate: **49.4%**
+- Retrospective test-passing repair rate: **32.9%**
+
+These are manuscript-reported results and should be reproduced from the corresponding defect-level experiment records.
+
+### Direct Prompting Baseline
+
+CoR is compared against direct GPT-4o prompting under the same maximum inference budgets and benchmark conditions.
+
+| Metric | CoR | Direct GPT-4o |
+|---|---:|---:|
+| Defects | 340 | 340 |
+| Top-1 localization | 169 | 169 |
+| Top-5 localization | 250 | 250 |
+| Test-passing repairs | 112 | 78 |
+| Mean tokens per defect | 8,400 | 4,600 |
+
+Both configurations use the same maximum resource allocation, but their actual token consumption differs.
+
+### Sensitivity Analysis
+
+The manuscript describes a separate 30-defect calibration experiment covering:
+
+- Alternative artifact weights
+- Top-K localization settings
+- Refinement budgets
+
+The calibration sample is specified as distinct from the main evaluation set.
+
+### Ablation Experiments
+
+The experimental design investigates the contribution of:
+
+- Structured reasoning
+- Validation
+- Individual artifact sources
+- Individual validation mechanisms
+
+### Transformation Robustness
+
+The manuscript reports paired original/transformed evaluations on 60 defects.
+
+| Configuration | Test-Passing Repairs |
+|---|---:|
+| Original | 20/60 |
+| Transformed | 17/60 |
+
+Transformations include identifier renaming, formatting and comment normalization and applicable semantics-preserving restructuring.
+
+These experiments measure sensitivity to selected program transformations. They do not establish the absence of benchmark exposure during model training.
+
+### Runtime and Inference Cost
+
+| Configuration | Median Latency | Mean Calls/Defect | Mean Tokens/Defect |
+|---|---|---:|---:|
+| Full CoR | 42 s (IQR 28–71) | 8.2 | 8,400 |
+| Direct GPT-4o | 25 s (IQR 16–43) | 5.1 | 4,600 |
+| Top-K = 10 | 57 s (IQR 35–96) | 11.4 | 11,900 |
+
+The multi-stage approach incurs additional inference cost compared with direct prompting.
+
+### Developer Study
+
+The manuscript also reports an exploratory developer study involving 10 participants.
+
+Reported outcomes include:
+
+- Explanation clarity: 84.0%
+- Debugging time reduction: 22.0%
+- Developer trust rating: 4.1/5
+
+These findings describe the evaluated study conditions and should not be interpreted as population-level proof of developer productivity improvements.
+
+---
+
+## Reproducibility and Experiment Artifacts
+
+Scientific replication requires versioned experiment configurations, benchmark identifiers, raw results and aggregation procedures.
+
+A recommended organization is:
+
+```text
+experiments/
+  manifests/
+  configs/
+  runners/
+  transformations/
+  results/
+    raw/
+    aggregated/
+  analysis/
+  environments/
+  examples/
+```
+
+This structure is a recommended organization for the experimental materials, not a claim that every directory is already present in the current repository.
+
+### Experiment Records
+
+Each experiment should record:
+
+- Benchmark name and version
+- Defect identifier
+- Source revision or hash
+- Available artifact types
+- Artifact-specific scores
+- Ranked candidate methods
+- Prompt template identifiers
+- Model snapshot
+- LLM call counts
+- Input and output token counts
+- Generated patches
+- Validation decisions
+- Rejection reasons
+- Refinement attempts
+- Execution time
+- Final framework status
+- Retrospective test outcome
+
+### Result Reproduction
+
+The complete replication package should provide a traceable mapping between:
+
+1. Experimental configuration
+2. Input defect manifest
+3. Raw defect-level outputs
+4. Aggregation procedure
+5. Published tables and metrics
+
+The GitHub release and Zenodo archive should identify the same code and experimental configuration.
+
+### Worked Example
+
+A complete repair trace should demonstrate:
+
+```text
+Input Defect
+    |
+    v
+Artifact Extraction
+    |
+    v
+Method Ranking
+    |
+    v
+Structured Diagnosis
+    |
+    v
+Patch Generation
+    |
+    v
+Consistency Assessment
+    |
+    v
+Compilation and Static Validation
+    |
+    v
+Final Patch
+    |
+    v
+Retrospective Test Evaluation
+```
+
+Retrospective test results must not be fed back into the repair process.
+
+---
+
+## Logging and Outputs
+
+The previously documented logging directory is:
 
 ```text
 logs/runs/{runId}/
 ```
 
-The directory contains files such as:
+A run may produce files such as:
 
 ```text
 input.json
@@ -342,41 +919,49 @@ explanation_response.txt
 final_result.json
 ```
 
-These logs are intended to demonstrate that prompts and responses are generated dynamically for each run.
+Log availability depends on which stages execute.
 
-## Code and Data Availability
+Sensitive values, including API keys and credentials, must be excluded from publicly shared logs.
 
-For review and publication, provide this repository as one of the following:
+---
 
-- a DOI-linked public repository, such as Zenodo archived from GitHub, or
-- a supplemental file with a descriptive legend that includes the term `code` and is marked as the appropriate file type in the submission system.
+## Limitations
 
-All code required to build and run the application is included in this repository. Sample input data are included under `sample_inputs/`. Third-party datasets are not redistributed here; their original source URLs are listed above and in `docs/datasets.md`.
+CoR has several important limitations.
 
-## Citations
+- Framework-plausible patches are not guaranteed to be functionally correct.
+- Benchmark test passing does not prove complete semantic correctness.
+- Static-analysis coverage varies across programming languages and tool configurations.
+- Artifact availability and quality influence localization performance.
+- Repair performance depends on model configuration, prompts, inference budgets and benchmark characteristics.
+- Public benchmark exposure may influence LLM behavior.
+- Multi-stage inference increases computational cost and latency.
+- Results obtained from selected benchmarks may not generalize to large industrial systems.
 
-If this repository is used with third-party datasets, cite the original dataset sources:
+---
 
-- Defects4J: https://defects4j.org/ and https://github.com/rjust/defects4j
+## Data Availability and Citation
+
+**Source Code**
+
+https://github.com/gulsahtan/CoR
+
+**Zenodo Archive**
+
+https://doi.org/10.5281/zenodo.20774174
+
+**Benchmark Sources**
+
+- Defects4J: https://github.com/rjust/defects4j
 - QuixBugs: https://github.com/jkoppel/QuixBugs
 - IntroClass: https://github.com/ProgramRepair/IntroClass
 
-Also cite the accompanying Chain-of-Repair AI Application article when available.
+When using CoR in academic research, cite the accompanying Chain-of-Repair manuscript and the original benchmark publications.
+
+For reproducible experiments, reference the exact repository commit and archived release.
+
+---
 
 ## License
 
-This repository is released under the MIT License. See `LICENSE`.
-
-## Contribution Guidelines
-
-Contributions should preserve reproducibility. In particular:
-
-- do not hard-code API keys,
-- do not add canned LLM outputs to the production pipeline,
-- keep prompt templates in `prompts/`,
-- keep logs sufficient to reproduce each repair run,
-- add or update tests for changes to parsing, ranking, LLM orchestration, patch application, validation, or logging.
-
-This repository is publicly available solely to support research transparency and the peer-review process.
-
-No permission is granted to copy, modify, redistribute, or use any part of this repository without prior written permission from the copyright holder.
+See the repository `LICENSE` file for the applicable licensing terms.
