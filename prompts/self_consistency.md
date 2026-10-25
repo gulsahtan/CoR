@@ -6,6 +6,8 @@ Return only strict JSON with this shape:
 
 {
   "passed": true,
+  "consistent": true,
+  "aligned": true,
   "concerns": [],
   "causalAlignment": "assessment grounded in the artifacts",
   "scopeAssessment": "assessment of whether changes stay inside the localized method/function"

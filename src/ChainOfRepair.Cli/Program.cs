@@ -1,3 +1,4 @@
+using ChainOfRepair.Core.Experiments;
 using System.Text;
 using System.Text.Json;
 using System.Globalization;
@@ -6,6 +7,27 @@ using ChainOfRepair.Core.Pipeline;
 using ChainOfRepair.Core.Ranking;
 using ChainOfRepair.Core.Reasoning;
 using ChainOfRepair.Core.Validation;
+
+if (args.Contains("--manifest"))
+{
+    string? Value(string flag) { var i = Array.IndexOf(args, flag); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
+    try
+    {
+        return await ExperimentRunner.RunAsync(Value("--manifest")!, Value("--output") ?? "experiments/results",
+            Path.GetFullPath(Value("--prompts") ?? "prompts"), Value("--case"), Value("--configuration"));
+    }
+    catch (Exception ex) { Console.Error.WriteLine(ex.Message); return 2; }
+}
+if (args.Length > 0 && args[0] == "report")
+{
+    if (args.Length != 3) { Console.Error.WriteLine("Usage: report <record-directory> <output-directory>"); return 2; }
+    var records = Directory.GetFiles(args[1], "*.record.json", SearchOption.AllDirectories)
+        .Select(p => JsonSerializer.Deserialize<ExperimentRecord>(File.ReadAllText(p), JsonLog.Options)!).ToArray();
+    if (records.Length == 0) { Console.Error.WriteLine("No measured experiment records found."); return 2; }
+    if (records.GroupBy(r => (r.Benchmark, r.BugId, r.Split, r.Configuration, r.Repeat)).Any(g => g.Count() > 1))
+    { Console.Error.WriteLine("Duplicate defect/configuration/repeat records; select one batch."); return 2; }
+    await ExperimentReports.WriteAsync(records, args[2]); return 0;
+}
 
 var options = CliOptions.Parse(args);
 if (options.ShowHelp)
@@ -26,10 +48,13 @@ var llmSettings = new LlmSettings
 var llmClient = new OpenAiLLMClient(llmSettings);
 var promptDirectory = Path.GetFullPath("prompts");
 
+var validationIndex = Array.IndexOf(args, "--validation");
+var validationConfiguration = validationIndex >= 0 && validationIndex + 1 < args.Length
+    ? JsonSerializer.Deserialize<ValidationConfiguration>(File.ReadAllText(args[validationIndex + 1]), JsonLog.Options) : null;
 var pipeline = new RepairPipelineService(
     new CoRReasoningService(llmClient, new PromptTemplateService(promptDirectory)),
     new PatchApplicationService(),
-    new ValidationService(),
+    new ValidationService(validationConfiguration),
     new WeightedBordaRanker(),
     llmClient,
     Path.Combine(options.OutputFolder, "logs"));
@@ -42,10 +67,12 @@ if (cases.Length == 0)
 }
 
 var summaryRows = new List<string> { "case_id,language,top_k,status,selected_method,score,validation_passed,json_path" };
+var failedCases = 0;
 foreach (var benchmarkCase in cases)
 {
     Console.WriteLine($"Running {benchmarkCase.CaseId}...");
     var result = await pipeline.RunAsync(benchmarkCase.Request);
+    if (!result.Accepted) failedCases++;
     var export = new BenchmarkRunExport { CaseId = benchmarkCase.CaseId, Result = result };
     var jsonPath = Path.Combine(options.OutputFolder, $"{Sanitize(benchmarkCase.CaseId)}.json");
     await File.WriteAllTextAsync(jsonPath, JsonSerializer.Serialize(export, JsonLog.Options));
@@ -63,8 +90,8 @@ foreach (var benchmarkCase in cases)
 }
 
 await File.WriteAllLinesAsync(Path.Combine(options.OutputFolder, "summary.csv"), summaryRows);
-Console.WriteLine($"Completed {cases.Length} case(s). Outputs: {options.OutputFolder}");
-return 0;
+Console.WriteLine($"Completed {cases.Length} case(s): {cases.Length - failedCases} accepted, {failedCases} unsuccessful. Outputs: {options.OutputFolder}");
+return failedCases == 0 ? 0 : 1;
 
 static string Csv(object? value)
 {
@@ -89,6 +116,10 @@ internal sealed record CliOptions(string InputFolder, string OutputFolder, Suppo
     public const string HelpText = """
         ChainOfRepair.Cli
 
+        Experiments: --manifest <json> --output <folder> [--case <id>] [--configuration <name>]
+        Aggregate: report <record-directory> <output-directory>
+
+        Single-file mode:
         Required:
           --input <folder>      Folder containing benchmark instances.
           --output <folder>     Folder where JSON and CSV outputs are written.
@@ -96,6 +127,7 @@ internal sealed record CliOptions(string InputFolder, string OutputFolder, Suppo
         Optional:
           --language <Java|Python|C|CSharp>  Default: Java
           --topk <3|5|10>                    Default: 5
+          --validation <json>               Build and differential static-analysis configuration
 
         Case layout:
           input/

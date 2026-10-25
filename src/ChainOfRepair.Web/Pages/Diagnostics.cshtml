@@ -15,9 +15,8 @@
                 <dt class="col-sm-4">.NET version</dt><dd class="col-sm-8">@Model.Diagnostics.DotNetVersion</dd>
                 <dt class="col-sm-4">LLM provider</dt><dd class="col-sm-8">@Model.Diagnostics.LlmProvider</dd>
                 <dt class="col-sm-4">OpenAI model</dt><dd class="col-sm-8">@Model.Diagnostics.OpenAiModelName</dd>
-                <dt class="col-sm-4">Mock client</dt><dd class="col-sm-8">@(Model.Diagnostics.UseMockClient ? "DEMO MODE - NOT VALID FOR REPRODUCIBILITY." : "Disabled")</dd>
                 <dt class="col-sm-4">Temperature</dt><dd class="col-sm-8">@Model.Diagnostics.Temperature</dd>
-                <dt class="col-sm-4">Max tokens</dt><dd class="col-sm-8">@Model.Diagnostics.MaxTokens</dd>
+                <dt class="col-sm-4">Absolute output ceiling</dt><dd class="col-sm-8">@Model.Diagnostics.MaxTokens</dd>
             </dl>
         </div>
         <div class="col-lg-6">

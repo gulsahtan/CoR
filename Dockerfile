@@ -8,5 +8,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8080
 COPY --from=build /app .
+COPY prompts /app/prompts
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "ChainOfRepair.Web.dll"]

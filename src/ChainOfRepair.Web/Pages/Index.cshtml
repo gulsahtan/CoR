@@ -12,21 +12,16 @@
         </div>
         @if (Model.Result is not null)
         {
-            <span class="badge text-bg-@(Model.Result.FinalStatus == "repaired" ? "success" : "secondary") fs-6">@Model.Result.FinalStatus</span>
+            <span class="badge text-bg-@(Model.Result.FinalStatus == "framework-plausible" ? "success" : "secondary") fs-6">@Model.Result.FinalStatus</span>
         }
     </div>
-    @if (Model.Result?.MockClientUsed == true)
-    {
-        <div class="alert alert-warning">DEMO MODE - NOT VALID FOR REPRODUCIBILITY.</div>
-    }
-
     <form method="post" class="row g-3">
         <div class="col-lg-8">
             <label asp-for="Input.SourceCode" class="form-label">Source Code</label>
             <textarea asp-for="Input.SourceCode" class="form-control code-input" spellcheck="false"></textarea>
         </div>
         <div class="col-lg-4">
-            <label asp-for="Input.FailingOutput" class="form-label">Failing Test / Compile Output</label>
+            <label asp-for="Input.FailingOutput" class="form-label">Non-test Stack Trace / Compiler Output</label>
             <textarea asp-for="Input.FailingOutput" class="form-control code-input" spellcheck="false"></textarea>
         </div>
         <div class="col-lg-8">
@@ -197,11 +192,19 @@
 
     <section class="cor-band mt-4">
         <h2 class="h4">LLM Exchanges</h2>
+        @if (Model.Result.Reasoning.Exchanges.Any(exchange => !exchange.IsComplete))
+        {
+            <div class="alert alert-warning">
+                A response failed completion or output validation. Rejected responses are shown below for inspection only;
+                they are never applied or treated as valid repairs. One compact regeneration is attempted when the remaining budget allows it.
+            </div>
+        }
         @foreach (var exchange in Model.Result.Reasoning.Exchanges)
         {
-            <details class="mb-2">
-                <summary>@exchange.Stage via @exchange.Client (@exchange.Model)</summary>
+            <details class="mb-2" open="@(!exchange.IsComplete)">
+                <summary>@exchange.Stage — attempt @exchange.Attempt — @(exchange.IsComplete ? "Complete" : "Rejected: " + (exchange.ErrorKind ?? "incomplete-response")) (@exchange.Model)</summary>
                 <p class="text-muted mb-1">Template: <code>@exchange.TemplatePath</code></p>
+                <p class="text-muted mb-1">Output cap: @exchange.MaxTokens � Retry: @(exchange.Attempt - 1) � Input tokens: @(exchange.InputTokens?.ToString() ?? "Unavailable") · Output tokens: @(exchange.OutputTokens?.ToString() ?? "Unavailable") · Finish reason: @(exchange.FinishReason ?? "Unavailable")</p>
                 <h3 class="h6">Prompt</h3>
                 <pre class="code-panel">@exchange.UserPrompt</pre>
                 <h3 class="h6">Response</h3>

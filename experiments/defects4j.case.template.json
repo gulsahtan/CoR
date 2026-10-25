@@ -1,0 +1,25 @@
+{
+  "benchmark": "Defects4J",
+  "bugId": "REPLACE_WITH_REAL_BUG_ID",
+  "revision": "REPLACE_WITH_CHECKOUT_COMMIT",
+  "split": "evaluation",
+  "language": "Java",
+  "projectDirectory": "../datasets/REPLACE/repair",
+  "evaluationDirectory": "../datasets/REPLACE/evaluation",
+  "sourceFiles": [
+    "src/main/java/REPLACE.java"
+  ],
+  "bugReportFile": null,
+  "stackTraceFile": null,
+  "historyFile": null,
+  "defectTime": null,
+  "referenceMethodsFile": "../datasets/REPLACE/reference-methods.json",
+  "build": {
+    "executable": "defects4j",
+    "arguments": [
+      "compile"
+    ]
+  },
+  "staticAnalysis": null,
+  "retrospectiveTests": null
+}

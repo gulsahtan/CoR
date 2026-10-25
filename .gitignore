@@ -9,3 +9,17 @@ logs/*.json
 sample_outputs/*.json
 sample_outputs/*.csv
 TestResults/
+
+# Local experiment inputs, credentials and generated evidence
+.env
+.env.*
+!.env.example
+*.secrets.json
+appsettings.Local.json
+logs/
+tmp/
+experiments/results/
+experiments/local/
+datasets/
+__pycache__/
+validation.Local.json

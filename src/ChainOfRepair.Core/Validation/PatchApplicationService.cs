@@ -37,6 +37,7 @@ public sealed class PatchApplicationService
         var diffLines = NormalizeLines(unifiedDiff);
         var offset = 0;
         var hunkCount = 0;
+        var previousEnd = 0;
 
         for (var i = 0; i < diffLines.Length; i++)
         {
@@ -48,11 +49,18 @@ public sealed class PatchApplicationService
 
             hunkCount++;
             var oldStart = int.Parse(match.Groups["oldStart"].Value);
-            var oldIndex = Math.Max(0, oldStart - 1 + offset);
+            var expectedOld = match.Groups["oldCount"].Success ? int.Parse(match.Groups["oldCount"].Value) : 1;
+            var expectedNew = match.Groups["newCount"].Success ? int.Parse(match.Groups["newCount"].Value) : 1;
+            var newStart = int.Parse(match.Groups["newStart"].Value);
+            var baseIndex = expectedOld == 0 ? oldStart : oldStart - 1;
+            if (baseIndex < previousEnd || baseIndex < 0 || newStart != oldStart + offset + (expectedOld == 0 ? 1 : 0))
+                return Failure(request.SourceCode, unifiedDiff, targetMethod, "Overlapping or inconsistent hunk coordinates.");
+            var oldIndex = baseIndex + offset;
             var cursor = oldIndex;
             var replacement = new List<string>();
             var oldTouched = new List<int>();
             var newTouched = new List<int>();
+            int? replacementAnchor = null;
 
             i++;
             while (i < diffLines.Length && !diffLines[i].StartsWith("@@", StringComparison.Ordinal))
@@ -66,10 +74,8 @@ public sealed class PatchApplicationService
 
                 if (line.Length == 0)
                 {
-                    replacement.Add("");
-                    cursor++;
-                    i++;
-                    continue;
+                    if (i == diffLines.Length - 1) { i++; break; }
+                    return Failure(request.SourceCode, unifiedDiff, targetMethod, "Unmarked blank line in unified diff.");
                 }
 
                 var marker = line[0];
@@ -77,6 +83,7 @@ public sealed class PatchApplicationService
                 switch (marker)
                 {
                     case ' ':
+                        replacementAnchor = null;
                         if (!LineMatches(working, cursor, content))
                         {
                             return Failure(request.SourceCode, unifiedDiff, targetMethod, $"Unified diff context mismatch at source line {cursor + 1}.");
@@ -91,10 +98,12 @@ public sealed class PatchApplicationService
                             return Failure(request.SourceCode, unifiedDiff, targetMethod, $"Unified diff deletion mismatch at source line {cursor + 1}.");
                         }
 
+                        replacementAnchor ??= cursor + 1 - offset;
                         oldTouched.Add(cursor + 1 - offset);
                         cursor++;
                         break;
                     case '+':
+                        oldTouched.Add(replacementAnchor ?? Math.Max(1, cursor + 1 - offset));
                         replacement.Add(content);
                         newTouched.Add(oldStart + replacement.Count - 1);
                         break;
@@ -114,7 +123,10 @@ public sealed class PatchApplicationService
                 return Failure(request.SourceCode, unifiedDiff, targetMethod, $"Unified diff hunk starts beyond end of source at line {oldStart}.");
             }
 
-            working.RemoveRange(oldIndex, Math.Min(removeCount, working.Count - oldIndex));
+            if (removeCount != expectedOld || replacement.Count != expectedNew || oldIndex + removeCount > working.Count)
+                return Failure(request.SourceCode, unifiedDiff, targetMethod, "Hunk body does not match declared line counts.");
+            previousEnd = baseIndex + expectedOld;
+            working.RemoveRange(oldIndex, removeCount);
             working.InsertRange(oldIndex, replacement);
             offset += replacement.Count - removeCount;
 

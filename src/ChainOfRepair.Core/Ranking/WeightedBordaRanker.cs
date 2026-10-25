@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using ChainOfRepair.Core.Models;
+using ChainOfRepair.Core.Parsing;
 
 namespace ChainOfRepair.Core.Ranking;
 
@@ -7,159 +8,107 @@ public sealed class WeightedBordaRanker
 {
     public RankingResult Rank(RepairRequest request, PreprocessingResult preprocessing)
     {
-        var candidates = preprocessing.CandidateMethods.ToArray();
-        if (candidates.Length == 0)
+        var methods = preprocessing.CandidateMethods.ToArray();
+        if (methods.Length == 0) return new();
+        var weights = NormalizeWeights(request.Weights, true,
+            preprocessing.FailingOutput.StackTraceFrames.Count > 0,
+            !string.IsNullOrWhiteSpace(request.BugDescription),
+            request.RevisionHistory is not null && request.DefectTime is not null);
+        var source = Borda(methods.Select(SourceScore).ToArray());
+        var trace = Borda(methods.Select(m => TraceScore(m, methods, preprocessing.FailingOutput.StackTraceFrames)).ToArray());
+        var report = Borda(LexicalScores(methods, request.BugDescription));
+        var history = Borda(methods.Select(m => HistoryScore(m, request)).ToArray());
+        var ranked = methods.Select((method, i) => new SuspiciousMethodScore
         {
-            return new RankingResult();
-        }
-
-        var weights = NormalizeWeights(
-            ArtifactWeights.Defaults,
-            hasSource: !string.IsNullOrWhiteSpace(request.SourceCode),
-            hasFailingOutput: !string.IsNullOrWhiteSpace(request.FailingOutput),
-            hasBugReport: !string.IsNullOrWhiteSpace(request.BugDescription),
-            hasRevisionHistory: false);
-
-        var sourceRaw = candidates.ToDictionary(m => m, SourceScore);
-        var failingRaw = candidates.ToDictionary(m => m, m => FailingOutputScore(m, preprocessing.FailingOutput));
-        var bugRaw = candidates.ToDictionary(m => m, m => BugReportScore(m, request.BugDescription));
-        var revisionRaw = candidates.ToDictionary(m => m, _ => 0.0);
-
-        var sourceBorda = ToBorda(sourceRaw);
-        var failingBorda = ToBorda(failingRaw);
-        var bugBorda = ToBorda(bugRaw);
-        var revisionBorda = ToBorda(revisionRaw);
-
-        var ranked = candidates
-            .Select(method =>
-            {
-                var final = weights.SourceContext * sourceBorda[method]
-                    + weights.FailingOutput * failingBorda[method]
-                    + weights.BugReport * bugBorda[method]
-                    + weights.RevisionHistory * revisionBorda[method];
-
-                return new SuspiciousMethodScore
-                {
-                    Method = method,
-                    SourceCodeScore = Round(sourceBorda[method]),
-                    StackTraceScore = Round(failingBorda[method]),
-                    BugReportScore = Round(bugBorda[method]),
-                    RevisionHistoryScore = Round(revisionBorda[method]),
-                    FinalSuspiciousnessScore = Round(final),
-                    Explanation = Explain(method, preprocessing.FailingOutput, request.BugDescription, sourceRaw[method], failingRaw[method], bugRaw[method])
-                };
-            })
-            .OrderByDescending(x => x.FinalSuspiciousnessScore)
-            .ThenBy(x => x.Method.StartLine)
-            .Take(Math.Clamp(request.TopK, 1, 10))
-            .ToArray();
-
-        return new RankingResult
-        {
-            NormalizedWeights = weights,
-            RankedMethods = ranked
-        };
+            Method = method, SourceCodeScore = source[i], StackTraceScore = trace[i],
+            BugReportScore = report[i], RevisionHistoryScore = history[i],
+            FinalSuspiciousnessScore = weights.SourceContext * source[i] + weights.FailingOutput * trace[i]
+                + weights.BugReport * report[i] + weights.RevisionHistory * history[i],
+            Explanation = "Average-tie Borda ranks; available artifact weights renormalized. See docs/ranking.md for raw scoring rules."
+        }).OrderByDescending(m => m.FinalSuspiciousnessScore).ThenByDescending(m => weights.SourceContext > 0 ? m.SourceCodeScore : 0)
+          .ThenBy(m => m.Method.Id, StringComparer.Ordinal).ToArray();
+        // Keep the full ordering for retrospective Top-5 even when the search uses Top-k=3.
+        return new() { NormalizedWeights = weights, RankedMethods = ranked };
     }
 
-    public ArtifactWeights NormalizeWeights(ArtifactWeights defaults, bool hasSource, bool hasFailingOutput, bool hasBugReport, bool hasRevisionHistory)
+    public ArtifactWeights NormalizeWeights(ArtifactWeights w, bool hasSource, bool hasFailingOutput, bool hasBugReport, bool hasRevisionHistory)
     {
-        var source = hasSource ? defaults.SourceContext : 0.0;
-        var failing = hasFailingOutput ? defaults.FailingOutput : 0.0;
-        var bug = hasBugReport ? defaults.BugReport : 0.0;
-        var revision = hasRevisionHistory ? defaults.RevisionHistory : 0.0;
-        var total = source + failing + bug + revision;
-
-        if (total <= 0)
-        {
-            return new ArtifactWeights(1, 0, 0, 0);
-        }
-
-        return new ArtifactWeights(Round(source / total), Round(failing / total), Round(bug / total), Round(revision / total));
+        var values = new[] { w.SourceContext, w.FailingOutput, w.BugReport, w.RevisionHistory };
+        if (values.Any(v => !double.IsFinite(v) || v < 0)) throw new ArgumentException("Weights must be finite and nonnegative.");
+        var a = hasSource ? w.SourceContext : 0;
+        var b = hasFailingOutput ? w.FailingOutput : 0;
+        var c = hasBugReport ? w.BugReport : 0;
+        var d = hasRevisionHistory ? w.RevisionHistory : 0;
+        var total = a + b + c + d;
+        return total == 0 ? new(0, 0, 0, 0) : new(a / total, b / total, c / total, d / total);
     }
 
-    private static double SourceScore(CandidateMethod method)
+    public static double[] Borda(double[] raw)
     {
-        var suspicious = method.SuspiciousConstructs.Count * 1.6;
-        var control = method.ControlFlowIndicators.Count * 0.8;
-        var size = Math.Min(2.0, Math.Max(0.0, (method.EndLine - method.StartLine + 1) / 80.0));
-        return suspicious + control + size;
-    }
-
-    private static double FailingOutputScore(CandidateMethod method, FailingOutputAnalysis output)
-    {
-        var score = 0.0;
-        var fullName = $"{method.Context}.{method.Name}";
-        if (output.MethodNames.Any(m => m.Equals(method.Name, StringComparison.OrdinalIgnoreCase) || fullName.EndsWith(m, StringComparison.OrdinalIgnoreCase)))
+        if (raw.Length == 1) return [1];
+        var result = new double[raw.Length];
+        var occupied = 0;
+        foreach (var group in raw.Select((score, index) => (score, index)).GroupBy(x => x.score).OrderByDescending(g => g.Key))
         {
-            score += 5.0;
+            var rank = occupied + (group.Count() + 1) / 2.0;
+            foreach (var item in group) result[item.index] = (raw.Length - rank) / (raw.Length - 1);
+            occupied += group.Count();
         }
-
-        if (output.LineNumbers.Any(line => line >= method.StartLine && line <= method.EndLine))
-        {
-            score += 4.0;
-        }
-
-        if (output.FileNames.Any(file => method.Context.Contains(Path.GetFileNameWithoutExtension(file), StringComparison.OrdinalIgnoreCase)))
-        {
-            score += 1.5;
-        }
-
-        if (output.ErrorTypes.Count > 0 && method.SuspiciousConstructs.Any(c => c.Contains("exception", StringComparison.OrdinalIgnoreCase) || c.Contains("null", StringComparison.OrdinalIgnoreCase)))
-        {
-            score += 1.0;
-        }
-
-        return score;
-    }
-
-    private static double BugReportScore(CandidateMethod method, string? bugReport)
-    {
-        if (string.IsNullOrWhiteSpace(bugReport))
-        {
-            return 0.0;
-        }
-
-        var tokens = Tokenize(bugReport).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var methodTokens = Tokenize($"{method.Name} {method.Context} {string.Join(' ', method.SuspiciousConstructs)} {string.Join(' ', method.ControlFlowIndicators)}");
-        return methodTokens.Count(tokens.Contains);
-    }
-
-    private static Dictionary<CandidateMethod, double> ToBorda(Dictionary<CandidateMethod, double> rawScores)
-    {
-        var count = rawScores.Count;
-        if (count == 1)
-        {
-            return rawScores.ToDictionary(x => x.Key, _ => 1.0);
-        }
-
-        var ordered = rawScores
-            .OrderByDescending(x => x.Value)
-            .ThenBy(x => x.Key.StartLine)
-            .Select((item, index) => new { item.Key, item.Value, Rank = index })
-            .ToArray();
-
-        var result = new Dictionary<CandidateMethod, double>();
-        foreach (var item in ordered)
-        {
-            result[item.Key] = item.Value <= 0 ? 0.0 : (double)(count - item.Rank - 1) / (count - 1);
-        }
-
         return result;
     }
 
-    private static IEnumerable<string> Tokenize(string text) =>
-        Regex.Matches(text, @"[A-Za-z_][A-Za-z0-9_]+").Select(m => m.Value);
-
-    private static string Explain(CandidateMethod method, FailingOutputAnalysis output, string? bugReport, double source, double failing, double bug)
+    public static double SourceScore(CandidateMethod m)
     {
-        var reasons = new List<string>();
-        if (source > 0) reasons.Add($"source contains {method.SuspiciousConstructs.Count} suspicious constructs and {method.ControlFlowIndicators.Count} control-flow indicators");
-        if (failing > 0) reasons.Add("failing output overlaps by method name, file context, line range, or error type");
-        if (bug > 0) reasons.Add("bug report vocabulary overlaps with the method/context");
-        if (output.LineNumbers.Any(line => line >= method.StartLine && line <= method.EndLine)) reasons.Add("reported failing line falls inside the candidate interval");
-        if (string.IsNullOrWhiteSpace(bugReport)) reasons.Add("bug-report artifact was missing and its weight was redistributed");
-        return reasons.Count == 0 ? "Ranked by normalized Borda aggregation with no strong artifact-specific signal." : string.Join("; ", reasons) + ".";
+        var patterns = new[] { @"<=|>=|\b(length|size|len|count)\b", @"\b\w+\s*(\.|->)\s*\w+",
+            @"\b\w+\s*\[[^\]]+\]", @"\b(throw|throws|try|catch|except|raise|finally)\b",
+            @"&&|\|\||\b(and|or)\b|==|!=" };
+        var code = SourceLexing.Mask(m.Source, m.Signature.StartsWith("def ", StringComparison.Ordinal));
+        return patterns.Count(p => Regex.IsMatch(code, p)) / 5.0;
     }
 
-    private static double Round(double value) => Math.Round(value, 4, MidpointRounding.AwayFromZero);
+    private static double TraceScore(CandidateMethod method, CandidateMethod[] methods, IReadOnlyList<StackTraceFrameInfo> frames)
+    {
+        for (var j = 0; j < frames.Count; j++)
+        {
+            var frame = frames[j];
+            var matches = methods.Where(m =>
+                (frame.FileName is null || Path.GetFileName(m.FilePath) == Path.GetFileName(frame.FileName)) &&
+                (frame.MethodName == m.Name || frame.MethodName == $"{m.Context}.{m.Name}" ||
+                    frame.MethodName?.EndsWith($".{m.Context}.{m.Name}", StringComparison.Ordinal) == true) &&
+                (frame.LineNumber is null || frame.LineNumber >= m.StartLine && frame.LineNumber <= m.EndLine)).ToArray();
+            if (matches.Length == 1 && matches[0] == method) return 1.0 / (j + 1);
+        }
+        return 0;
+    }
+
+    private static double HistoryScore(CandidateMethod method, RepairRequest request)
+    {
+        if (request.DefectTime is null || request.RevisionHistory is null) return 0;
+        if (request.HistoryWindowDays <= 0 || !double.IsFinite(request.HistoryDecayPerDay) || request.HistoryDecayPerDay < 0)
+            throw new ArgumentException("Invalid history window or decay.");
+        return request.RevisionHistory.Where(h => h.MethodId == method.Id)
+            .DistinctBy(h => h.Commit).Select(h => (request.DefectTime.Value - h.Timestamp).TotalDays)
+            .Where(days => days > 0 && days <= request.HistoryWindowDays)
+            .Sum(days => Math.Exp(-request.HistoryDecayPerDay * days));
+    }
+
+    public static double[] LexicalScores(CandidateMethod[] methods, string? report)
+    {
+        var documents = methods.Select(m => Tokens($"{m.Context} {m.Signature} {string.Join(' ', Regex.Matches(m.Source, @"//[^\n]*|/\*[\s\S]*?\*/|#[^\n]*").Select(x => x.Value))}").ToArray()).ToArray();
+        var vocabulary = documents.SelectMany(d => d).Distinct(StringComparer.Ordinal).ToArray();
+        var query = Tokens(report ?? "").ToArray();
+        var idf = vocabulary.ToDictionary(t => t, t => Math.Log((1.0 + methods.Length) / (1 + documents.Count(d => d.Contains(t)))) + 1);
+        Dictionary<string, double> Vector(string[] words) => words.Where(idf.ContainsKey).GroupBy(t => t)
+            .ToDictionary(g => g.Key, g => g.Count() * idf[g.Key]);
+        var q = Vector(query);
+        var qNorm = Math.Sqrt(q.Values.Sum(v => v * v));
+        return documents.Select(d =>
+        {
+            var v = Vector(d); var norm = Math.Sqrt(v.Values.Sum(x => x * x));
+            return qNorm == 0 || norm == 0 ? 0 : v.Sum(x => x.Value * q.GetValueOrDefault(x.Key)) / (qNorm * norm);
+        }).ToArray();
+    }
+    private static IEnumerable<string> Tokens(string text) => Regex.Matches(
+        Regex.Replace(Regex.Replace(text, "([A-Z]+)([A-Z][a-z])", "$1 $2"), "([a-z0-9])([A-Z])", "$1 $2").Replace('_', ' ').ToLowerInvariant(),
+        @"[a-z][a-z0-9]*").Select(m => m.Value);
 }

@@ -18,7 +18,7 @@ public sealed class DiagnosticsService
         var dependencyVersions = new Dictionary<string, string>
         {
             ["ChainOfRepair.Core"] = typeof(DiagnosticsService).Assembly.GetName().Version?.ToString() ?? "local",
-            ["OpenAI API client"] = "HTTP Chat Completions"
+            ["OpenAI .NET SDK"] = typeof(OpenAI.OpenAIClient).Assembly.GetName().Version?.ToString() ?? "unknown"
         };
 
         return new EnvironmentDiagnostics
@@ -31,8 +31,8 @@ public sealed class DiagnosticsService
             {
                 ["Java"] = Environment.GetEnvironmentVariable("COR_JAVA_COMPILER") ?? "PATH: javac",
                 ["Python"] = Environment.GetEnvironmentVariable("COR_PYTHON") ?? "PATH: python/python3",
-                ["C"] = Environment.GetEnvironmentVariable("COR_C_COMPILER") ?? "PATH: gcc/clang",
-                ["CSharp"] = Environment.GetEnvironmentVariable("COR_CSHARP_BUILD") ?? "fallback structural syntax"
+                ["C"] = Environment.GetEnvironmentVariable("COR_C_COMPILER") ?? "PATH: clang",
+                ["CSharp"] = "Explicit Validation.Build command required"
             },
             OpenAiModelName = _llmSettings.Model,
             LlmProvider = _llmSettings.Provider,

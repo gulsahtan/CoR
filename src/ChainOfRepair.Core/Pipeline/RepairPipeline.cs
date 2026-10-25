@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using ChainOfRepair.Core.Models;
 using ChainOfRepair.Core.Parsing;
@@ -7,301 +8,162 @@ using ChainOfRepair.Core.Validation;
 
 namespace ChainOfRepair.Core.Pipeline;
 
-public sealed class RepairPipelineService
+public sealed class RepairPipelineService(CoRReasoningService reasoningService, PatchApplicationService patchApplicationService,
+    IValidationService validationService, WeightedBordaRanker ranker, ILLMClient llmClient, string? logRootDirectory = null)
 {
-    private readonly CoRReasoningService _reasoningService;
-    private readonly PatchApplicationService _patchApplicationService;
-    private readonly ValidationService _validationService;
-    private readonly WeightedBordaRanker _ranker;
-    private readonly ILLMClient _llmClient;
-    private readonly string _logRootDirectory;
-
-    public RepairPipelineService(
-        CoRReasoningService reasoningService,
-        PatchApplicationService patchApplicationService,
-        ValidationService validationService,
-        WeightedBordaRanker ranker,
-        ILLMClient llmClient,
-        string? logRootDirectory = null)
-    {
-        _reasoningService = reasoningService;
-        _patchApplicationService = patchApplicationService;
-        _validationService = validationService;
-        _ranker = ranker;
-        _llmClient = llmClient;
-        _logRootDirectory = logRootDirectory ?? Path.Combine(AppContext.BaseDirectory, "logs");
-    }
-
     public async Task<RepairPipelineResult> RunAsync(RepairRequest request, CancellationToken cancellationToken = default)
     {
+        var timer = Stopwatch.StartNew();
+        var id = Guid.NewGuid().ToString("n");
+        var directory = Path.Combine(logRootDirectory ?? "logs", "runs", id);
+        Directory.CreateDirectory(directory);
         var trace = new List<PipelineTraceEntry>();
-        var runId = Guid.NewGuid().ToString("n");
-        var runDirectory = Path.Combine(_logRootDirectory, "runs", runId);
-        Directory.CreateDirectory(runDirectory);
-
-        Trace(trace, "start", "Repair pipeline started.");
-        var normalizedRequest = request with { TopK = NormalizeTopK(request.TopK) };
-        await WriteJsonAsync(runDirectory, "input.json", normalizedRequest, cancellationToken);
-
-        PreprocessingResult preprocessing;
-        RankingResult ranking;
-        try
-        {
-            var parser = ArtifactParserFactory.Create(normalizedRequest.Language);
-            preprocessing = parser.Parse(normalizedRequest);
-            Trace(trace, "preprocessing", $"Extracted {preprocessing.CandidateMethods.Count} candidate method/function artifact(s).");
-
-            ranking = _ranker.Rank(normalizedRequest, preprocessing);
-            Trace(trace, "ranking", $"Computed artifact-aware Weighted Borda ranking and selected top {ranking.RankedMethods.Count} candidate(s).");
-            await WriteJsonAsync(runDirectory, "ranked_methods.json", ranking, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            var failed = BuildBaseResult(runId, runDirectory, normalizedRequest, trace) with
-            {
-                FinalStatus = "failed",
-                ErrorMessage = "Preprocessing or ranking failed: " + ex.Message
-            };
-            await WriteJsonAsync(runDirectory, "final_result.json", failed, cancellationToken);
-            return failed with { LogPath = Path.Combine(runDirectory, "final_result.json") };
-        }
-
-        var selected = ranking.RankedMethods.FirstOrDefault();
-        if (selected is null)
-        {
-            var empty = BuildBaseResult(runId, runDirectory, normalizedRequest, trace) with
-            {
-                Preprocessing = preprocessing,
-                Ranking = ranking,
-                FinalStatus = "unrepaired",
-                ErrorMessage = "No candidate method/function could be extracted from the input source."
-            };
-            await WriteJsonAsync(runDirectory, "final_result.json", empty, cancellationToken);
-            return empty with { LogPath = Path.Combine(runDirectory, "final_result.json") };
-        }
-
         var exchanges = new List<LlmExchange>();
+        var candidates = new List<CandidateOutcome>();
         var refinements = new List<RefinementIteration>();
-
+        var preprocessing = new PreprocessingResult(); var ranking = new RankingResult();
+        SuspiciousMethodScore? selected = null;
+        var validation = new ValidationResult();
+        string diagnosis = "", patch = "", check = "", explanation = "", status = "unrepaired", error = "";
+        var accepted = false;
+        llmClient.BeginRun();
+        reasoningService.BeginRun();
+        await Write("input.json", request);
         try
         {
-            var rootCause = await _reasoningService.GenerateRootCauseAsync(
-                normalizedRequest,
-                selected,
-                preprocessing.FailingOutput,
-                ranking.RankedMethods,
-                cancellationToken);
-            exchanges.Add(rootCause);
-            await WriteExchangeAsync(runDirectory, "root_cause", rootCause, responseFileExtension: ".json", cancellationToken);
-            EnsureJsonStage(rootCause.Response, "root-cause");
-            Trace(trace, "root-cause", "Received dynamic root-cause JSON from the LLM.");
-
-            var patch = await _reasoningService.GeneratePatchAsync(normalizedRequest, selected.Method, rootCause.Response, cancellationToken);
-            exchanges.Add(patch);
-            await WriteExchangeAsync(runDirectory, "patch", patch, responseFileExtension: ".json", cancellationToken);
-            EnsureJsonStage(patch.Response, "patch-synthesis");
-            Trace(trace, "patch-synthesis", "Received dynamic patch JSON from the LLM.");
-
-            var application = _patchApplicationService.Apply(normalizedRequest, selected.Method, patch.Response);
-            var consistency = await _reasoningService.GenerateSelfConsistencyAsync(
-                normalizedRequest,
-                selected.Method,
-                rootCause.Response,
-                patch.Response,
-                application,
-                cancellationToken);
-            exchanges.Add(consistency);
-            await WriteExchangeAsync(runDirectory, "self_consistency", consistency, responseFileExtension: ".json", cancellationToken);
-            Trace(trace, "self-consistency", "Received dynamic self-consistency result from the LLM.");
-
-            await File.WriteAllTextAsync(Path.Combine(runDirectory, "patched_code.txt"), application.PatchedCode, cancellationToken);
-            var validation = await _validationService.ValidateAsync(normalizedRequest, selected.Method, rootCause.Response, patch.Response, application, cancellationToken);
-            await WriteJsonAsync(runDirectory, "validation_result.json", validation, cancellationToken);
-            Trace(trace, "validation", validation.Passed ? "Initial patch passed validation." : "Initial patch failed validation; entering refinement loop.");
-
-            var finalPatch = patch;
-            var finalConsistency = consistency;
-            var finalValidation = validation;
-
-            for (var iteration = 1; !finalValidation.Passed && iteration <= 3; iteration++)
+            if (request.TopK is < 1 or > 10 || request.MaxRefinements is < 0 or > 5)
+                throw new ArgumentException("TopK must be 1..10 and MaxRefinements 0..5.");
+            if (request.Workflow is not ("cor" or "direct" or "lexical")) throw new ArgumentException("Unknown workflow.");
+            var files = request.SourceFiles.Count > 0 ? request.SourceFiles : [new SourceArtifact(request.FileName ?? "input", request.SourceCode)];
+            var parsed = files.Select(f => ArtifactParserFactory.Create(request.Language).Parse(request with { FileName = f.Path, SourceCode = f.Content, SourceFiles = [] })).ToArray();
+            preprocessing = new() { CandidateMethods = parsed.SelectMany(p => p.CandidateMethods).ToArray(),
+                Logs = parsed.SelectMany(p => p.Logs).ToArray(), FailingOutput = FailingOutputParser.Parse(request.FailingOutput) };
+            ranking = ranker.Rank(request, preprocessing);
+            if (request.Workflow == "lexical")
             {
-                var refinement = await _reasoningService.GenerateRefinementAsync(
-                    normalizedRequest,
-                    selected.Method,
-                    rootCause.Response,
-                    finalPatch.Response,
-                    finalValidation.PatchApplication,
-                    finalValidation,
-                    iteration,
-                    cancellationToken);
-                exchanges.Add(refinement);
-                await WriteExchangeAsync(runDirectory, $"refinement_{iteration}", refinement, responseFileExtension: ".json", cancellationToken);
-                EnsureJsonStage(refinement.Response, $"refinement-{iteration}");
-
-                var refinedApplication = _patchApplicationService.Apply(normalizedRequest, selected.Method, refinement.Response);
-                var refinedConsistency = await _reasoningService.GenerateSelfConsistencyAsync(
-                    normalizedRequest,
-                    selected.Method,
-                    rootCause.Response,
-                    refinement.Response,
-                    refinedApplication,
-                    cancellationToken);
-                exchanges.Add(refinedConsistency);
-                await WriteExchangeAsync(runDirectory, $"refinement_{iteration}_self_consistency", refinedConsistency, responseFileExtension: ".json", cancellationToken);
-
-                finalValidation = await _validationService.ValidateAsync(normalizedRequest, selected.Method, rootCause.Response, refinement.Response, refinedApplication, cancellationToken);
-                await WriteJsonAsync(runDirectory, $"refinement_{iteration}_validation_result.json", finalValidation, cancellationToken);
-
-                finalPatch = refinement;
-                finalConsistency = refinedConsistency;
-                refinements.Add(new RefinementIteration
+                if (string.IsNullOrWhiteSpace(request.BugDescription)) status = "ineligible";
+                else
                 {
-                    Iteration = iteration,
-                    PatchJson = refinement.Response,
-                    SelfConsistency = refinedConsistency.Response,
-                    Validation = finalValidation,
-                    Exchanges = [refinement, refinedConsistency]
-                });
-
-                await File.WriteAllTextAsync(Path.Combine(runDirectory, "patched_code.txt"), refinedApplication.PatchedCode, cancellationToken);
-                Trace(trace, "refinement", $"Iteration {iteration} {(finalValidation.Passed ? "passed" : "failed")} validation.");
+                    var methods = preprocessing.CandidateMethods.ToArray();
+                    var scores = WeightedBordaRanker.LexicalScores(methods, request.BugDescription);
+                    ranking = ranking with { RankedMethods = methods.Select((m, i) => new SuspiciousMethodScore { Method = m, BugReportScore = scores[i], FinalSuspiciousnessScore = scores[i] })
+                        .OrderByDescending(s => s.FinalSuspiciousnessScore).ThenBy(s => s.Method.Id, StringComparer.Ordinal).ToArray() };
+                    status = "localization-only";
+                }
             }
-
-            var explanation = await _reasoningService.GenerateExplanationAsync(
-                normalizedRequest,
-                selected.Method,
-                rootCause.Response,
-                finalPatch.Response,
-                finalConsistency.Response,
-                finalValidation,
-                cancellationToken);
-            exchanges.Add(explanation);
-            await WriteExchangeAsync(runDirectory, "explanation", explanation, responseFileExtension: ".txt", cancellationToken);
-            Trace(trace, "explanation", "Received dynamic developer explanation from the LLM.");
-
-            var reasoning = new ReasoningResult
+            await Write("ranked_methods.json", ranking);
+            trace.Add(new(DateTimeOffset.UtcNow, "ranking", $"Ranked {ranking.RankedMethods.Count} methods; search Top-{request.TopK}."));
+            if (request.Workflow != "lexical")
+            foreach (var candidate in ranking.RankedMethods.Take(request.TopK))
             {
-                RootCause = rootCause.Response,
-                PatchJson = finalPatch.Response,
-                SelfConsistency = finalConsistency.Response,
-                Explanation = explanation.Response,
-                Exchanges = exchanges
-            };
-
-            var result = BuildBaseResult(runId, runDirectory, normalizedRequest, trace) with
-            {
-                Preprocessing = preprocessing,
-                Ranking = ranking,
-                SelectedMethod = selected,
-                Reasoning = reasoning,
-                FinalValidation = finalValidation,
-                RefinementIterations = refinements,
-                FinalStatus = finalValidation.Passed ? "repaired" : "unrepaired",
-                PromptTemplatesUsed = exchanges.Select(exchange => exchange.TemplatePath).Distinct().ToArray()
-            };
-
-            Trace(trace, "finish", $"Repair pipeline finished with status: {result.FinalStatus}.");
-            await WriteJsonAsync(runDirectory, "final_result.json", result, cancellationToken);
-            return result with { LogPath = Path.Combine(runDirectory, "final_result.json") };
+                selected = candidate;
+                var file = files.Single(f => f.Path == candidate.Method.FilePath);
+                var localRequest = request with { SourceCode = file.Content, FileName = file.Path };
+                diagnosis = "{}"; patch = ""; check = "";
+                if (request.Workflow == "cor")
+                {
+                    var exchange = await reasoningService.GenerateRootCauseAsync(localRequest, candidate, preprocessing.FailingOutput,
+                        ranking.RankedMethods.Take(request.TopK).Select(s => s with { Method = s.Method with { Source = "", LocalContext = "" } }).ToArray(), cancellationToken);
+                    await RecordExchanges(); diagnosis = exchange.Response;
+                    using var parsedDiagnosis = JsonDocument.Parse(JsonResponse.Normalize(diagnosis));
+                    var diagnosisObject = parsedDiagnosis.RootElement;
+                    if (diagnosisObject.ValueKind != JsonValueKind.Object ||
+                        !new[] { "faultCategory", "rootCause", "localizedMethod" }.All(key => diagnosisObject.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString())) ||
+                        !diagnosisObject.TryGetProperty("evidence", out var evidence) || evidence.ValueKind != JsonValueKind.Array ||
+                        !diagnosisObject.TryGetProperty("confidence", out var confidence) || confidence.ValueKind != JsonValueKind.Number || !confidence.TryGetDouble(out var confidenceValue) || confidenceValue is < 0 or > 1)
+                        throw new LlmCallException("DIAGNOSE response does not satisfy the required schema.");
+                }
+                for (var iteration = 0; iteration <= request.MaxRefinements; iteration++)
+                {
+                    var exchange = request.Workflow == "direct"
+                        ? await reasoningService.GenerateDirectPatchAsync(localRequest, candidate.Method, patch, iteration == 0 ? "" : validation.RefinementInstruction, cancellationToken)
+                        : iteration == 0
+                            ? await reasoningService.GeneratePatchAsync(localRequest, candidate.Method, diagnosis, cancellationToken)
+                            : await reasoningService.GenerateRefinementAsync(localRequest, candidate.Method, diagnosis, patch,
+                                validation.PatchApplication, validation, iteration, cancellationToken);
+                    await RecordExchanges(); patch = exchange.Response;
+                    var application = patchApplicationService.Apply(localRequest, candidate.Method, patch);
+                    var checkPass = true;
+                    if (request.Workflow == "cor")
+                    {
+                        var consistency = await reasoningService.GenerateSelfConsistencyAsync(localRequest, candidate.Method, diagnosis, patch, application, cancellationToken);
+                        await RecordExchanges(); check = consistency.Response; checkPass = CheckPasses(check);
+                    }
+                    validation = await validationService.ValidateAsync(localRequest, candidate.Method, diagnosis, patch, application, cancellationToken);
+                    if (request.Workflow == "cor" && !request.DisabledValidationRules.Contains("causal-alignment") && !request.DisabledValidationRules.Contains("all"))
+                    {
+                        var checks = validation.Checks.Append(new ValidationCheck("causal-alignment", checkPass, "CHECK requires passed=true, consistent=true and aligned=true.")).ToArray();
+                        validation = validation with { Checks = checks, Passed = checks.All(c => c.Passed),
+                            RefinementInstruction = validation.RefinementInstruction + (checkPass ? "" : " | CHECK failed: " + check) };
+                    }
+                    candidates.Add(new(candidate.Method.Id, iteration, diagnosis, patch, check, validation, validation.Passed));
+                    if (iteration > 0) refinements.Add(new() { Iteration = iteration, PatchJson = patch, SelfConsistency = check, Validation = validation });
+                    await Write($"candidate_{candidates.Count:D3}.json", candidates[^1]);
+                    await Write("validation_result.json", validation);
+                    await File.WriteAllTextAsync(Path.Combine(directory, "patched_code.txt"), application.PatchedCode, cancellationToken);
+                    if (!validation.Passed) continue;
+                    accepted = true;
+                    status = request.DisabledValidationRules.Count == 0 ? "framework-plausible" : "accepted-ablation";
+                    // Acceptance is immutable. EXPLAIN errors/budget exhaustion never revoke a selected patch.
+                    try
+                    {
+                        var exp = await reasoningService.GenerateExplanationAsync(localRequest, candidate.Method, diagnosis, patch, check, validation, cancellationToken);
+                        await RecordExchanges(); explanation = exp.Response;
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    { error = "Accepted patch retained; explanation unavailable: " + ex.Message; }
+                    break;
+                }
+                if (accepted) break;
+            }
         }
-        catch (LlmStageException ex)
-        {
-            await WritePromptOnlyAsync(runDirectory, ex, cancellationToken);
-            var failed = BuildBaseResult(runId, runDirectory, normalizedRequest, trace) with
-            {
-                Preprocessing = preprocessing,
-                Ranking = ranking,
-                SelectedMethod = selected,
-                Reasoning = new ReasoningResult { Exchanges = exchanges },
-                RefinementIterations = refinements,
-                FinalStatus = "llm-error",
-                ErrorMessage = $"{ex.Stage} LLM call failed: {ex.Message}",
-                PromptTemplatesUsed = exchanges.Select(exchange => exchange.TemplatePath).Append(ex.TemplatePath).Distinct().ToArray()
-            };
-            Trace(trace, "llm-error", failed.ErrorMessage);
-            await WriteJsonAsync(runDirectory, "final_result.json", failed, cancellationToken);
-            return failed with { LogPath = Path.Combine(runDirectory, "final_result.json") };
-        }
+        catch (OperationCanceledException) { status = "cancelled"; error = "Repair cancelled."; }
         catch (Exception ex)
         {
-            var failed = BuildBaseResult(runId, runDirectory, normalizedRequest, trace) with
+            status = IsBudget(ex) ? "budget-exhausted" : IsTruncated(ex) ? "output-truncated" : ex is LlmStageException or LlmCallException or LlmConfigurationException ? "llm-error" : "failed";
+            error = ex.Message;
+            if (ex is LlmStageException stage)
+                await Write("failed_stage.json", new { stage.Stage, stage.TemplatePath, stage.SystemPrompt, stage.UserPrompt, stage.Message });
+        }
+        await RecordExchanges();
+        trace.Add(new(DateTimeOffset.UtcNow, "finish", status));
+        var result = new RepairPipelineResult
+        {
+            RunId = id, Request = request, Preprocessing = preprocessing, Ranking = ranking, SelectedMethod = selected,
+            Reasoning = new() { RootCause = diagnosis, PatchJson = patch, SelfConsistency = check, Explanation = explanation, Exchanges = exchanges },
+            FinalValidation = validation, RefinementIterations = refinements, Candidates = candidates,
+            ModelCalls = llmClient.Calls.ToArray(), DurationSeconds = timer.Elapsed.TotalSeconds, Accepted = accepted,
+            FrameworkPlausible = request.DisabledValidationRules.Count > 0 || request.Workflow == "lexical" || status is "failed" or "llm-error" or "cancelled" or "output-truncated" ? null : accepted,
+            FinalStatus = status, ErrorMessage = error, Trace = trace, LogDirectory = directory, LogPath = Path.Combine(directory, "final_result.json"),
+            UsedRealLlmClient = llmClient is OpenAiLLMClient, MockClientUsed = llmClient.IsMock,
+            LlmClientName = llmClient.ClientName, ModelName = llmClient.Settings.Model,
+            PromptTemplatesUsed = exchanges.Select(e => e.TemplatePath).Distinct().ToArray()
+        };
+        await Write("final_result.json", result);
+        return result;
+
+        async Task Write(string name, object data) => await File.WriteAllTextAsync(Path.Combine(directory, name), JsonSerializer.Serialize(data, JsonLog.Options), CancellationToken.None);
+        async Task RecordExchanges()
+        {
+            foreach (var exchange in reasoningService.Exchanges.Skip(exchanges.Count).ToArray())
             {
-                Preprocessing = preprocessing,
-                Ranking = ranking,
-                SelectedMethod = selected,
-                Reasoning = new ReasoningResult { Exchanges = exchanges },
-                RefinementIterations = refinements,
-                FinalStatus = "failed",
-                ErrorMessage = ex.Message,
-                PromptTemplatesUsed = exchanges.Select(exchange => exchange.TemplatePath).Distinct().ToArray()
-            };
-            Trace(trace, "failed", ex.Message);
-            await WriteJsonAsync(runDirectory, "final_result.json", failed, cancellationToken);
-            return failed with { LogPath = Path.Combine(runDirectory, "final_result.json") };
+                exchanges.Add(exchange);
+                await Write($"exchange_{exchanges.Count:D3}.json", exchange);
+                var prefix = exchange.Stage.Replace('-', '_') + (exchange.IsComplete ? "" : $"_attempt_{exchange.Attempt}_incomplete");
+                await File.WriteAllTextAsync(Path.Combine(directory, prefix + "_prompt.txt"), exchange.UserPrompt, CancellationToken.None);
+                await File.WriteAllTextAsync(Path.Combine(directory, prefix + "_response." + (exchange.IsComplete && exchange.Stage != "explanation" ? "json" : "txt")), exchange.Response, CancellationToken.None);
+            }
         }
     }
-
-    private RepairPipelineResult BuildBaseResult(string runId, string runDirectory, RepairRequest request, IReadOnlyList<PipelineTraceEntry> trace) =>
-        new()
-        {
-            RunId = runId,
-            Request = request,
-            Trace = trace,
-            LogDirectory = runDirectory,
-            UsedRealLlmClient = !_llmClient.IsMock,
-            MockClientUsed = _llmClient.IsMock,
-            LlmClientName = _llmClient.ClientName,
-            ModelName = _llmClient.Settings.Model
-        };
-
-    private static async Task WriteExchangeAsync(
-        string runDirectory,
-        string filePrefix,
-        LlmExchange exchange,
-        string responseFileExtension,
-        CancellationToken cancellationToken)
-    {
-        await File.WriteAllTextAsync(Path.Combine(runDirectory, $"{filePrefix}_prompt.txt"), exchange.UserPrompt, cancellationToken);
-        await File.WriteAllTextAsync(Path.Combine(runDirectory, $"{filePrefix}_response{responseFileExtension}"), exchange.Response, cancellationToken);
-    }
-
-    private static async Task WritePromptOnlyAsync(string runDirectory, LlmStageException exception, CancellationToken cancellationToken)
-    {
-        var prefix = exception.Stage switch
-        {
-            "root-cause" => "root_cause",
-            "patch-synthesis" => "patch",
-            "self-consistency" => "self_consistency",
-            "explanation" => "explanation",
-            "refinement" => "refinement_failed",
-            _ => exception.Stage.Replace('-', '_')
-        };
-        await File.WriteAllTextAsync(Path.Combine(runDirectory, $"{prefix}_prompt.txt"), exception.UserPrompt, cancellationToken);
-        await File.WriteAllTextAsync(Path.Combine(runDirectory, $"{prefix}_error.txt"), exception.Message, cancellationToken);
-    }
-
-    private static async Task WriteJsonAsync(string runDirectory, string fileName, object value, CancellationToken cancellationToken)
-    {
-        await File.WriteAllTextAsync(
-            Path.Combine(runDirectory, fileName),
-            JsonSerializer.Serialize(value, JsonLog.Options),
-            cancellationToken);
-    }
-
-    private static void EnsureJsonStage(string response, string stage)
+    private static bool IsTruncated(Exception ex) => ex is LlmOutputTruncatedException || ex.InnerException is not null && IsTruncated(ex.InnerException);
+    private static bool IsBudget(Exception ex) => ex is InferenceBudgetException || ex.InnerException is not null && IsBudget(ex.InnerException);
+    public static bool CheckPasses(string response)
     {
         try
         {
-            using var _ = JsonDocument.Parse(JsonResponse.Normalize(response));
+            using var doc = JsonDocument.Parse(JsonResponse.Normalize(response));
+            return new[] { "passed", "consistent", "aligned" }.All(k => doc.RootElement.TryGetProperty(k, out var v) && v.ValueKind == JsonValueKind.True);
         }
-        catch (JsonException ex)
-        {
-            throw new LlmCallException($"The {stage} LLM response was not valid JSON: {ex.Message}", ex);
-        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException) { return false; }
     }
-
-    private static void Trace(List<PipelineTraceEntry> trace, string stage, string message) =>
-        trace.Add(new PipelineTraceEntry(DateTimeOffset.UtcNow, stage, message));
-
-    private static int NormalizeTopK(int topK) => topK is 3 or 5 or 10 ? topK : 5;
 }

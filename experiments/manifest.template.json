@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "model": {
+    "provider": "OpenAI",
+    "model": "gpt-4o",
+    "temperature": 0.2,
+    "maxTokens": 2048,
+    "totalTokenBudget": 16000,
+    "maxCalls": 20,
+    "useMockClient": false
+  },
+  "repeats": 1,
+  "configurations": [
+    {
+      "name": "full-cor"
+    }
+  ],
+  "cases": []
+}

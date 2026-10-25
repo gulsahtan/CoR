@@ -12,6 +12,15 @@ public enum SupportedLanguage
 
 public sealed record RepairRequest
 {
+    public IReadOnlyList<SourceArtifact> SourceFiles { get; init; } = [];
+    public IReadOnlyList<HistoryChange>? RevisionHistory { get; init; }
+    public DateTimeOffset? DefectTime { get; init; }
+    public int HistoryWindowDays { get; init; } = 365;
+    public double HistoryDecayPerDay { get; init; } = 0.01;
+    public ArtifactWeights Weights { get; init; } = ArtifactWeights.Defaults;
+    public int MaxRefinements { get; init; } = 3;
+    public string Workflow { get; init; } = "cor";
+    public IReadOnlyList<string> DisabledValidationRules { get; init; } = [];
     public string SourceCode { get; init; } = "";
     public string FailingOutput { get; init; } = "";
     public string? BugDescription { get; init; }
@@ -22,6 +31,9 @@ public sealed record RepairRequest
 
 public sealed record CandidateMethod
 {
+    public string FilePath { get; init; } = "";
+    public string Signature { get; init; } = "";
+    public string Id => $"{FilePath}::{Context}.{Signature}";
     public string Name { get; init; } = "unknown";
     public string Context { get; init; } = "input";
     public int StartLine { get; init; }
@@ -78,17 +90,39 @@ public sealed record RankingResult
     public IReadOnlyList<SuspiciousMethodScore> RankedMethods { get; init; } = [];
 }
 
+public sealed record StageTokenLimits
+{
+    public int RootCause { get; init; } = 512;
+    public int Patch { get; init; } = 2048;
+    public int Refinement { get; init; } = 2048;
+    public int DirectPatch { get; init; } = 2048;
+    public int SelfConsistency { get; init; } = 512;
+    public int Explanation { get; init; } = 384;
+    public int PatchLengthRetry { get; init; } = 4096;
+}
+
 public sealed record LlmSettings
 {
+    public int TotalTokenBudget { get; init; } = 16000;
+    public int MaxCalls { get; init; } = 20;
     public string Provider { get; init; } = "OpenAI";
     public string Model { get; init; } = "gpt-4o";
     public float Temperature { get; init; } = 0.2f;
+    // Absolute per-call ceiling, including the one permitted patch-length retry.
     public int MaxTokens { get; init; } = 2048;
+    public StageTokenLimits OutputLimits { get; init; } = new();
     public bool UseMockClient { get; init; }
 }
 
 public sealed record LlmExchange
 {
+    public string? ErrorKind { get; init; }
+    public bool IsComplete { get; init; } = true;
+    public string? FinishReason { get; init; }
+    public int Attempt { get; init; } = 1;
+    public string PromptHash { get; init; } = "";
+    public int? InputTokens { get; init; }
+    public int? OutputTokens { get; init; }
     public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow;
     public string Stage { get; init; } = "";
     public string Client { get; init; } = "";
@@ -147,6 +181,11 @@ public sealed record PipelineTraceEntry(DateTimeOffset Timestamp, string Stage, 
 
 public sealed record RepairPipelineResult
 {
+    public IReadOnlyList<CandidateOutcome> Candidates { get; init; } = [];
+    public IReadOnlyList<ModelCall> ModelCalls { get; init; } = [];
+    public double DurationSeconds { get; init; }
+    public bool Accepted { get; init; }
+    public bool? FrameworkPlausible { get; init; }
     public string RunId { get; init; } = Guid.NewGuid().ToString("n");
     public RepairRequest Request { get; init; } = new();
     public PreprocessingResult Preprocessing { get; init; } = new();
@@ -197,7 +236,8 @@ public static class JsonLog
     {
         WriteIndented = true,
         PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+        PropertyNameCaseInsensitive = true,
         Converters = { new JsonStringEnumConverter() }
     };
 }

@@ -1,13 +1,9 @@
-# Patch Synthesis
-
-Generate one minimal, real source-code edit that addresses the supplied root-cause JSON. The edit must be scoped to the localized method/function unless the artifacts make that impossible, and it must be expressed as a standard unified diff against the original full source code.
-
-Return only strict JSON with this shape:
-
-{
-  "patchType": "unified-diff",
-  "targetMethod": "method/function name",
-  "changedLinesRationale": "why these exact lines change",
-  "unifiedDiff": "--- a/input\n+++ b/input\n@@ -start,count +start,count @@\n ...",
-  "expectedEffect": "behavioral effect of the patch"
-}
+Generate the smallest complete unified diff fixing the diagnosed failure inside the selected method.
+Preserve omitted code and avoid unrelated refactoring. Return the required JSON;
+use patchType "unified-diff" and one short sentence per rationale/effect.
+For a one-line replacement by two lines, the hunk structure is:
+@@ -N,1 +N,2 @@
+-<exact original line including indentation>
++<first replacement line including indentation>
++<second replacement line including indentation>
+Substitute actual line numbers and source; never output placeholders.

@@ -1,0 +1,15 @@
+.git
+**/bin
+**/obj
+**/__pycache__
+tmp
+datasets
+logs
+sample_outputs
+experiments/results
+experiments/local
+.env
+.env.*
+**/*.secrets.json
+**/appsettings.Local.json
+validation.Local.json

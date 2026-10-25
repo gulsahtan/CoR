@@ -1,0 +1,27 @@
+{
+  "benchmark": "QuixBugs",
+  "bugId": "REPLACE_WITH_REAL_BUG_ID",
+  "revision": "REPLACE_WITH_CHECKOUT_COMMIT",
+  "split": "evaluation",
+  "language": "Python",
+  "projectDirectory": "../datasets/REPLACE/repair",
+  "evaluationDirectory": "../datasets/REPLACE/evaluation",
+  "sourceFiles": [
+    "python_programs/REPLACE.py"
+  ],
+  "bugReportFile": null,
+  "stackTraceFile": null,
+  "historyFile": null,
+  "defectTime": null,
+  "referenceMethodsFile": "../datasets/REPLACE/reference-methods.json",
+  "build": {
+    "executable": "python",
+    "arguments": [
+      "-m",
+      "py_compile",
+      "{file}"
+    ]
+  },
+  "staticAnalysis": null,
+  "retrospectiveTests": null
+}

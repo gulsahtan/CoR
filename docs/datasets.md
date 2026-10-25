@@ -27,3 +27,11 @@ case-id/
 ```
 
 The framework records dataset provenance through JSON logs and CLI output files.
+
+## Benchmark configuration
+
+Use pinned checkouts and the manifest workflow in [experiments.md](experiments.md).
+The single-file sample format is for local application testing. Project-level
+benchmark runs use explicit production sources, build/static-analysis commands,
+and separate retrospective test directories. Each run records its case ID,
+source hashes, configuration and measured outcomes.

@@ -1,0 +1,26 @@
+{
+  "benchmark": "IntroClass",
+  "bugId": "REPLACE_WITH_REAL_BUG_ID",
+  "revision": "REPLACE_WITH_CHECKOUT_COMMIT",
+  "split": "evaluation",
+  "language": "C",
+  "projectDirectory": "../datasets/REPLACE/repair",
+  "evaluationDirectory": "../datasets/REPLACE/evaluation",
+  "sourceFiles": [
+    "REPLACE.c"
+  ],
+  "bugReportFile": null,
+  "stackTraceFile": null,
+  "historyFile": null,
+  "defectTime": null,
+  "referenceMethodsFile": "../datasets/REPLACE/reference-methods.json",
+  "build": {
+    "executable": "clang",
+    "arguments": [
+      "-fsyntax-only",
+      "{file}"
+    ]
+  },
+  "staticAnalysis": null,
+  "retrospectiveTests": null
+}

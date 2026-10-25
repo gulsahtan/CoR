@@ -100,19 +100,26 @@ public abstract class RegexArtifactParser : IArtifactParser
     private List<CandidateMethod> ExtractMethods(string source, string[] lines, string? fileName, List<PreprocessingLogEntry> logs)
     {
         var methods = new List<CandidateMethod>();
-        foreach (Match match in _methodRegex.Matches(source))
+        var masked = SourceLexing.Mask(source, Language == SupportedLanguage.Python);
+        foreach (Match match in _methodRegex.Matches(masked))
         {
             var name = match.Groups["name"].Value;
-            var startLine = GetLineNumber(source, match.Index);
+            // Permissive signature regexes can backtrack inside a control keyword.
+            // Inspect the complete header token rather than only the captured name.
+            var header = match.Value.TrimStart();
+            if (Language != SupportedLanguage.Python && Regex.IsMatch(header, @"^((if|while|for|switch|catch|synchronized|lock|using)\s*\(|(else|try|do)\b)")) continue;
+            var startLine = GetLineNumber(source, match.Index + match.Value.TakeWhile(char.IsWhiteSpace).Count());
             var endLine = Language == SupportedLanguage.Python
-                ? FindPythonFunctionEnd(lines, startLine)
-                : FindBraceRegionEnd(lines, startLine);
-            var context = FindContext(source, match.Index, fileName);
+                ? FindPythonFunctionEnd(NormalizeLines(masked), startLine)
+                : GetLineNumber(source, SourceLexing.ClosingBrace(masked, match.Index + match.Length - 1));
+            var context = FindContext(masked, match.Index, fileName);
             var methodLines = lines.Skip(startLine - 1).Take(Math.Max(1, endLine - startLine + 1)).ToArray();
             var localLines = lines.Skip(Math.Max(0, startLine - 4)).Take(Math.Min(lines.Length, endLine - startLine + 7)).ToArray();
 
             var method = new CandidateMethod
             {
+                FilePath = fileName ?? "input",
+                Signature = Regex.Replace(source.Substring(match.Index + match.Value.TakeWhile(char.IsWhiteSpace).Count(), match.Length - match.Value.TakeWhile(char.IsWhiteSpace).Count()).Trim().TrimEnd('{', ':').Trim(), @"\s+", " "),
                 Name = name,
                 Context = context,
                 StartLine = startLine,
@@ -134,21 +141,8 @@ public abstract class RegexArtifactParser : IArtifactParser
             }));
         }
 
-        if (methods.Count == 0 && !string.IsNullOrWhiteSpace(source))
-        {
-            methods.Add(new CandidateMethod
-            {
-                Name = "file_scope",
-                Context = fileName ?? "input",
-                StartLine = 1,
-                EndLine = Math.Max(1, lines.Length),
-                Source = source,
-                LocalContext = source,
-                ControlFlowIndicators = DetectControlFlow(lines),
-                SuspiciousConstructs = DetectSuspiciousConstructs(lines)
-            });
-            logs.Add(Log("source.method.fallback", "No function signature was detected; using a file-scope candidate.", null));
-        }
+        if (methods.Count == 0)
+            logs.Add(Log("source.method.missing", "No supported method signature detected; no file-scope surrogate is ranked.", null));
 
         return methods;
     }
@@ -206,33 +200,6 @@ public abstract class RegexArtifactParser : IArtifactParser
         }
 
         return count;
-    }
-
-    private static int FindBraceRegionEnd(string[] lines, int startLine)
-    {
-        var depth = 0;
-        var started = false;
-        for (var i = startLine - 1; i < lines.Length; i++)
-        {
-            foreach (var ch in lines[i])
-            {
-                if (ch == '{')
-                {
-                    depth++;
-                    started = true;
-                }
-                else if (ch == '}')
-                {
-                    depth--;
-                    if (started && depth <= 0)
-                    {
-                        return i + 1;
-                    }
-                }
-            }
-        }
-
-        return lines.Length;
     }
 
     private static int FindPythonFunctionEnd(string[] lines, int startLine)
