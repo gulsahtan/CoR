@@ -1,0 +1,494 @@
+{
+  "schema": "cor-canonical-split-v1",
+  "protocol_date": "2026-10-26",
+  "seed": "cor-quixbugs-10-30-v1-2026-10-26",
+  "repository": "https://github.com/jkoppel/QuixBugs",
+  "commit": "4257f44b0ff1181dedaedee6a447e133219fcebf",
+  "inventory_sha256": "bf1b2ecc1c7bd1f14e9a52f3ae5647caac25fc74fcef55436aa48cd74740c93c",
+  "primary_language": "Java",
+  "selection": "Known development cases forced into calibration; remaining IDs ordered by SHA256(seed|canonical ID)",
+  "historical_exposure": "Unknown beyond documented development pilots; not a retrospective independence claim",
+  "split": "evaluation",
+  "defects": [
+    {
+      "canonical_defect_id": "find_first_in_sorted",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/FIND_FIRST_IN_SORTED.java",
+          "sha256": "d51626063f87b741a8a6e72ced9b23199c4beddee0783e149602342324f93164",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/FIND_FIRST_IN_SORTED.java"
+        },
+        "Python": {
+          "path": "python_programs/find_first_in_sorted.py",
+          "sha256": "1056d304a9cc07258aaca85934d1b17c4abe722aa6c71e542a7d3b8154ee7f2a",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/find_first_in_sorted.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "find_in_sorted",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/FIND_IN_SORTED.java",
+          "sha256": "ed63bce55dca6e6d9bf2abf6db950786bf502355b1bc645e9dfd8ffd5524b3a5",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/FIND_IN_SORTED.java"
+        },
+        "Python": {
+          "path": "python_programs/find_in_sorted.py",
+          "sha256": "71234198a0556c633f259bb3315123d14ca0fb0c77eda10fcf7cd7a4ce3e8091",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/find_in_sorted.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "flatten",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/FLATTEN.java",
+          "sha256": "a5ccbfa24aa0ad24cabfdb3666a95097f3b8dc0b75d4236989cc3e6499dba58d",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/FLATTEN.java"
+        },
+        "Python": {
+          "path": "python_programs/flatten.py",
+          "sha256": "f6f5a5f9442e63245dc593955467da427308e2c66f84351fff1f27cd3a136780",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/flatten.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "gcd",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/GCD.java",
+          "sha256": "7a16a78bca6591de70eabaef9c612f8aded5f2f40ac67498466e4024f325491f",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/GCD.java"
+        },
+        "Python": {
+          "path": "python_programs/gcd.py",
+          "sha256": "5a11580ba4845b6bae20c49b31eed14eb7bfedb7870550f6b752b41eabf03b4c",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/gcd.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "get_factors",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/GET_FACTORS.java",
+          "sha256": "b7ef176e4d41ef36d12f79acaa1de7f17b378daa77065b0dfb6c08fcbb6c06db",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/GET_FACTORS.java"
+        },
+        "Python": {
+          "path": "python_programs/get_factors.py",
+          "sha256": "c544115d6aeb2d6c762c3902033e27708cc48d79d3b42df95f2934db3e8ccf2a",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/get_factors.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "hanoi",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/HANOI.java",
+          "sha256": "3567762c9c5c38416210b64310f3097e072743d618b4be1c2b50275bd32c660e",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/HANOI.java"
+        },
+        "Python": {
+          "path": "python_programs/hanoi.py",
+          "sha256": "fed5455da416d6bb74328ededbd4cd3f7887211fd8466fc712a560d926ae4a99",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/hanoi.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "is_valid_parenthesization",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/IS_VALID_PARENTHESIZATION.java",
+          "sha256": "cd51eef7398c1c0763c22928b2f5ff171714bbdd8ce0a270f03ec7bda898ba06",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/IS_VALID_PARENTHESIZATION.java"
+        },
+        "Python": {
+          "path": "python_programs/is_valid_parenthesization.py",
+          "sha256": "10f82dd99219c3653aa0243f52b42f03a334e3af7bf38c5bc255d98bf91d6d55",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/is_valid_parenthesization.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "kheapsort",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/KHEAPSORT.java",
+          "sha256": "eb39c5c1a98a130be9fe60510039fdcfa70d7f4879f8c7892fd1c13dac1f22e6",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/KHEAPSORT.java"
+        },
+        "Python": {
+          "path": "python_programs/kheapsort.py",
+          "sha256": "bbc1e7df0c79b96bb0512818d507e7acb493fc76670cda4552d09d47b7cdabcf",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/kheapsort.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "kth",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/KTH.java",
+          "sha256": "a5ae29968f763ca038511ea89b40787ea55756a0e94ac978ec8a6872fd99aab3",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/KTH.java"
+        },
+        "Python": {
+          "path": "python_programs/kth.py",
+          "sha256": "148b8e6ffe80fe69d8602d45d91cbb44c82934c62c38ef1bae5cf0c30cfff861",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/kth.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "lcs_length",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/LCS_LENGTH.java",
+          "sha256": "e0892c283dd64e0ec169d2abd7923eb356c75d80bf7a2d67eef23f7dc3f17265",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/LCS_LENGTH.java"
+        },
+        "Python": {
+          "path": "python_programs/lcs_length.py",
+          "sha256": "f67020074297cb3506a4524fd71729597059f9a91eb61b71b86bd49ce85df00b",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/lcs_length.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "levenshtein",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/LEVENSHTEIN.java",
+          "sha256": "ee1b7bc544156fbd475ea03e3b5e6b3e6edecae3f7de31e6ee0c647308f04ea0",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/LEVENSHTEIN.java"
+        },
+        "Python": {
+          "path": "python_programs/levenshtein.py",
+          "sha256": "c3f2d471861c46b69990bfe271c646ecf52d51f4f0aa3b8b6d5104b102b442ff",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/levenshtein.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "longest_common_subsequence",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/LONGEST_COMMON_SUBSEQUENCE.java",
+          "sha256": "2746f75e2c6ff997660636a0e4de63a81f73d694eafcfbffd8f429fa8e3383fe",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/LONGEST_COMMON_SUBSEQUENCE.java"
+        },
+        "Python": {
+          "path": "python_programs/longest_common_subsequence.py",
+          "sha256": "971c60f971d33255a8c675669d139d68a57408b6565b1ab8f40748f3377a99e1",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/longest_common_subsequence.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "max_sublist_sum",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/MAX_SUBLIST_SUM.java",
+          "sha256": "23ae9caa4ea2f15a32b61ad7e3ee4b1b4d767fd0362bb137803fcad65aa5a118",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/MAX_SUBLIST_SUM.java"
+        },
+        "Python": {
+          "path": "python_programs/max_sublist_sum.py",
+          "sha256": "6a61460050736ddff53202daf74fb37c562bf6c1236f192996c906b1c66ab61a",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/max_sublist_sum.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "mergesort",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/MERGESORT.java",
+          "sha256": "e3788f7319bb405ab5722b44d79021fe7e7f1e7e551470b8a8814332ce6b9987",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/MERGESORT.java"
+        },
+        "Python": {
+          "path": "python_programs/mergesort.py",
+          "sha256": "bc6b0977582bb394187dd3418f94811e2bc4cc9bd675b9410baf336a833389a6",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/mergesort.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "next_palindrome",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/NEXT_PALINDROME.java",
+          "sha256": "aa84a4465f123d4ac86ab3b1e52218386fc114d3c674bbd085fec6be2bb504c8",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/NEXT_PALINDROME.java"
+        },
+        "Python": {
+          "path": "python_programs/next_palindrome.py",
+          "sha256": "a61013879591ddcde6a26cfac96c1575298afa201a03a7c903245496a099c2fd",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/next_palindrome.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "next_permutation",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/NEXT_PERMUTATION.java",
+          "sha256": "03abb2eda7be5c71d778c69bff3e121be20defc21862e07757c4894ac32c5e80",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/NEXT_PERMUTATION.java"
+        },
+        "Python": {
+          "path": "python_programs/next_permutation.py",
+          "sha256": "0411c86a51f9898b02ecd778c83d973124d769dda7d8c3831f803871eef4a22f",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/next_permutation.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "pascal",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/PASCAL.java",
+          "sha256": "096d88635b3ef5c11aeff8d53d1d106f9a1764d101ef18a6c926a075e17623ab",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/PASCAL.java"
+        },
+        "Python": {
+          "path": "python_programs/pascal.py",
+          "sha256": "b064475e9710b95396b629c1a0d4de9252af9e5fa30227f39963508e302259db",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/pascal.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "possible_change",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/POSSIBLE_CHANGE.java",
+          "sha256": "dbcaaf9634c6a7f7caf972080fb7e666633e249c67a1f8b74bb0fc8332f31811",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/POSSIBLE_CHANGE.java"
+        },
+        "Python": {
+          "path": "python_programs/possible_change.py",
+          "sha256": "38d526b0b2bde93bccabf580a909df9fd46a2ba2325ef325c6578903bfad4f66",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/possible_change.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "powerset",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/POWERSET.java",
+          "sha256": "22050d02a05a501f8487104ef453c2ff55a7373ee24a076af939d8f4d1de12ff",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/POWERSET.java"
+        },
+        "Python": {
+          "path": "python_programs/powerset.py",
+          "sha256": "32349b0ab55c8e5c5f6f88dd042ef560da9ba94de28bd5fce9da592b2f7a2a51",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/powerset.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "reverse_linked_list",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/REVERSE_LINKED_LIST.java",
+          "sha256": "1021c6dd76526e1ef80e6721cdd1f359b0268fe990c220b9666c82b8977efc10",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/REVERSE_LINKED_LIST.java"
+        },
+        "Python": {
+          "path": "python_programs/reverse_linked_list.py",
+          "sha256": "6c59c02f722b804f30b799331eea3e0d1976d018aa4d228c0412f3ac9af8ce48",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/reverse_linked_list.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "rpn_eval",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/RPN_EVAL.java",
+          "sha256": "df81f8473d000dacaa97d0e40bffe428285a2726f9affdebf0550107a07d734e",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/RPN_EVAL.java"
+        },
+        "Python": {
+          "path": "python_programs/rpn_eval.py",
+          "sha256": "52002ae22f8f2eb7dbc6dfabfb6e5bf21807b21805bcaf60248ae9630673dffe",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/rpn_eval.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "shortest_path_length",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/SHORTEST_PATH_LENGTH.java",
+          "sha256": "b4d3b481c7096461d429a5f0ac0b0378dc91b932bb52c02aebb48eceae931b06",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/SHORTEST_PATH_LENGTH.java"
+        },
+        "Python": {
+          "path": "python_programs/shortest_path_length.py",
+          "sha256": "d9ac1034ba04d7a58cd6dcf780b52e9cd68b9e503821d0821b30869f38008278",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/shortest_path_length.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "shortest_path_lengths",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/SHORTEST_PATH_LENGTHS.java",
+          "sha256": "096035053ff989ea8c28bbea49ba899f109214ebd8e494ad46f5822b0823c8d4",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/SHORTEST_PATH_LENGTHS.java"
+        },
+        "Python": {
+          "path": "python_programs/shortest_path_lengths.py",
+          "sha256": "4325d3a9b28b8a808ce1c523388da7df85f1574d5df0fd8848014f01e8f5666c",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/shortest_path_lengths.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "shunting_yard",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/SHUNTING_YARD.java",
+          "sha256": "ac148b86f763ba58ed98cbeaae563f0eda89a9e5128e6c5446774bac8b08c537",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/SHUNTING_YARD.java"
+        },
+        "Python": {
+          "path": "python_programs/shunting_yard.py",
+          "sha256": "7d6cb90fb2a83fce505de8e56d0a8c24e5825131d3d2009dcd705d05d2d81f87",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/shunting_yard.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "sieve",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/SIEVE.java",
+          "sha256": "0ae365763ecc0c6dceb98443d59d4be81ffbc32c801930451c7b176ef1873162",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/SIEVE.java"
+        },
+        "Python": {
+          "path": "python_programs/sieve.py",
+          "sha256": "570704d5faf58d0fd702aa2278b3bd43bc52b53183b4f8193acd39c11d049807",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/sieve.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "sqrt",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/SQRT.java",
+          "sha256": "26cc4d8f7201c8ad9ecd62de4430b431b9e49d381f8c59ca0de443db7aadd25a",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/SQRT.java"
+        },
+        "Python": {
+          "path": "python_programs/sqrt.py",
+          "sha256": "e4e0a68773d380cadba19c5d2d860633dc6c2a038bc59ddac0a7c8021b8c3726",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/sqrt.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "subsequences",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/SUBSEQUENCES.java",
+          "sha256": "cd143db2046caf393b421cfd2f3eb88237d552abb1de4e01e44418851805a1c2",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/SUBSEQUENCES.java"
+        },
+        "Python": {
+          "path": "python_programs/subsequences.py",
+          "sha256": "bab1a76aa1a35c882d9f7fff5ea7068f3a3b35d1f3a7ab398aef46a9b017dda0",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/subsequences.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "to_base",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/TO_BASE.java",
+          "sha256": "a0b417127fa442377ad823ec37750e16e64b9dad8fc730a5a90293b71cf2da0b",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/TO_BASE.java"
+        },
+        "Python": {
+          "path": "python_programs/to_base.py",
+          "sha256": "4eadb54e2cc5d6854c1034c5667381061915719c4cd84da72428a590182d2dae",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/to_base.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "topological_ordering",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/TOPOLOGICAL_ORDERING.java",
+          "sha256": "42187d54a001e53bc32dda37e87fa4e5e8d7ea1a08bd888ff54ad717f7e1a710",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/TOPOLOGICAL_ORDERING.java"
+        },
+        "Python": {
+          "path": "python_programs/topological_ordering.py",
+          "sha256": "30448909f97a140ca57579d77d40e312c88604663ee92050369772668778e74b",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/topological_ordering.py"
+        }
+      }
+    },
+    {
+      "canonical_defect_id": "wrap",
+      "known_prior_development_pilot": false,
+      "implementations": {
+        "Java": {
+          "path": "java_programs/WRAP.java",
+          "sha256": "76b8017bf8bf11e8300b89eb2b305ac962c834cba7c1494592e63fc0e71bb113",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/java_programs/WRAP.java"
+        },
+        "Python": {
+          "path": "python_programs/wrap.py",
+          "sha256": "eb76433536ae58fa2955fbe053a8f9e45e7deb7d3894048acb7cdab13f1f5282",
+          "source_url": "https://github.com/jkoppel/QuixBugs/blob/4257f44b0ff1181dedaedee6a447e133219fcebf/python_programs/wrap.py"
+        }
+      }
+    }
+  ]
+}
